@@ -5,8 +5,11 @@
 
 * year slider id: select_year
 * continent drop down id: select_continent
-
-* 
+Plot IDs:
+* map: map_chart
+* bubble: bubble_chart
+* waterfall: water_chart
+* bar: bar_chart
 
 
 
