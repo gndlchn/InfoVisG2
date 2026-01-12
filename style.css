@@ -1,0 +1,12 @@
+body {
+  font-family: 'Arial', sans-serif; 
+}
+
+.responsive-svg-container {
+  margin-right: auto;
+  margin-left: auto;
+  width: 100%;
+  max-width: 1000px;
+}
+#bar { height: 100% !important; }
+.card-body { display: block !important; }
