@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <title>GDP Waterfall — Veränderung über Zeit</title>
+
+  <!-- D3 v7 -->
+  <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+
+  <link rel="stylesheet" href="style.css" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+</head>
+<body>
+  <main>
+    <h1>GDP Waterfall — Veränderung über Zeit (Jahr → Jahr)</h1>
+
+    <div class="controls">
+      <label for="countrySelect">Land wählen:</label>
+      <select id="countrySelect" size="8"></select>
+      <div class="controls-buttons">
+        <button id="resetView">Reset View</button>
+      </div>
+    </div>
+
+    <div id="chartCard">
+      <svg id="chart" aria-label="GDP Waterfall chart"></svg>
+    </div>
+
+    <p class="note">
+      Die Daten kommen aus <code>merged(2).csv</code> (semikolon-getrennt). Dezimal-Kommas werden beim Parsen ersetzt.
+    </p>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
