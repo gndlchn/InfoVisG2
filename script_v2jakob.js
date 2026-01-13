@@ -11,17 +11,17 @@ function updateAllPlots() {
     const yearLabel = document.getElementById("select_year-value");
     if (yearLabel) yearLabel.innerText = window.vizState.selectedYear;
 
+    // These call the specific drawing functions below
     if (typeof updateMap === "function") updateMap();
-    if (typeof updateWaterfall === "function") updateWaterfall(); // JAKOB'S PART
-    if (typeof updateChart === "function") updateChart();         // TRADE PART
+    updateWaterfall(); 
+    updateChart(); // This is the Trade Bar Chart
 }
 
-// 3. DATA LOADING & PARSING
-d3.text("./merged(2).csv").then(raw => {
-    // Jakob: We use your numeric parsing logic here to handle commas/NaNs
+// 3. DATA LOADING
+d3.text("./merged(2)_jakob.csv").then(raw => {
     const parseNum = (s) => {
         if (!s) return NaN;
-        let v = String(s).replace(/,/g, ".");
+        let v = String(s).replace(/\s/g, "").replace(/,/g, ".");
         return parseFloat(v);
     };
 
@@ -30,13 +30,14 @@ d3.text("./merged(2).csv").then(raw => {
         country: d["Country Name"],
         year: +d.Year,
         gdp: parseNum(d.GDP),
-        exportsval: parseNum(d["Exports of goods and services (constant 2015 USD)"]),
-        importsval: parseNum(d["Imports of goods and services (constant 2015 USD)"])
+        // Note: Check your CSV column names; some use US$ and some use USD
+        exportsval: parseNum(d["Exports of goods and services (constant 2015 US$)"]),
+        importsval: parseNum(d["Imports of goods and services (constant 2015 US$)"])
     }));
 
     window.vizState.data = data;
 
-    // Listeners for filters
+    // Filter Listeners
     document.getElementById("select_continent").addEventListener("change", (e) => {
         window.vizState.selectedContinent = e.target.value;
         updateAllPlots();
@@ -50,16 +51,14 @@ d3.text("./merged(2).csv").then(raw => {
     updateAllPlots();
 });
 
-// 4. JAKOB'S WATERFALL LOGIC (Integrated)
+// 4. JAKOB'S WATERFALL LOGIC
 function updateWaterfall() {
     const country = window.vizState.selectedCountry;
     const allData = window.vizState.data;
     if (!allData) return;
 
-    // Filter for the specific country and sort by year
     const countryData = allData.filter(d => d.country === country).sort((a, b) => a.year - b.year);
     
-    // Prepare Waterfall steps
     let steps = [];
     for (let i = 0; i < countryData.length; i++) {
         const curr = countryData[i];
@@ -92,9 +91,7 @@ function drawWaterfallSVG(data) {
     const x = d3.scaleBand().domain(data.map(d => d.name)).range([margin.left, width - margin.right]).padding(0.2);
     const y = d3.scaleLinear().domain([0, d3.max(data, d => d.end) * 1.1]).range([height - margin.bottom, margin.top]);
 
-    const g = svg.append("g");
-
-    g.selectAll(".bar").data(data).join("rect")
+    svg.append("g").selectAll("rect").data(data).join("rect")
         .attr("x", d => x(d.name))
         .attr("y", d => y(Math.max(d.start, d.end)))
         .attr("width", x.bandwidth())
@@ -105,14 +102,60 @@ function drawWaterfallSVG(data) {
     svg.append("g").attr("transform", `translate(${margin.left},0)`).call(d3.axisLeft(y).tickFormat(d3.format(".2s")));
 }
 
-// 5. TRADE BAR CHART LOGIC
+// 5. TRADE BAR CHART LOGIC (Diverging Bars)
 function updateChart() {
-    // ... (Keep the Trade Bar Chart code from our previous chat here) ...
+    const data = window.vizState.data;
+    if (!data) return;
+
+    const year = window.vizState.selectedYear;
+    const continent = window.vizState.selectedContinent;
+
+    const filtered = data.filter(d => d.year === year && (continent === "All" || d.region === continent))
+                        .filter(d => !isNaN(d.exportsval) && !isNaN(d.importsval));
+
+    const maxVal = d3.max(filtered, d => Math.max(d.exportsval, d.importsval)) || 1e9;
+
+    d3.select("#bar_chart").selectAll("svg").remove();
+    
+    const margin = {top: 20, right: 30, bottom: 40, left: 120};
+    const width = d3.select("#bar_chart").node().getBoundingClientRect().width;
+    const height = Math.max(450, filtered.length * 25);
+
+    const svg = d3.select("#bar_chart").append("svg")
+        .attr("width", width).attr("height", height);
+
+    const x = d3.scaleLinear().domain([-maxVal, maxVal]).range([margin.left, width - margin.right]);
+    const y = d3.scaleBand().domain(filtered.map(d => d.country)).range([margin.top, height - margin.bottom]).padding(0.2);
+
+    const tooltip = d3.select("#tooltip");
+
+    // Bars
+    const bars = svg.append("g");
+    
+    // Exports (Right side - Green)
+    bars.selectAll(".bar-export").data(filtered).join("rect")
+        .attr("x", x(0)).attr("y", d => y(d.country))
+        .attr("width", d => x(d.exportsval) - x(0))
+        .attr("height", y.bandwidth()).attr("fill", "#2e8b57")
+        .on("mouseover", (e, d) => tooltip.style("opacity", 1).html(`Export: ${d3.format(".2s")(d.exportsval)}`))
+        .on("mousemove", e => tooltip.style("left", (e.pageX+10)+"px").style("top", (e.pageY-20)+"px"))
+        .on("mouseout", () => tooltip.style("opacity", 0));
+
+    // Imports (Left side - Red)
+    bars.selectAll(".bar-import").data(filtered).join("rect")
+        .attr("x", d => x(-d.importsval)).attr("y", d => y(d.country))
+        .attr("width", d => x(0) - x(-d.importsval))
+        .attr("height", y.bandwidth()).attr("fill", "#b22222")
+        .on("mouseover", (e, d) => tooltip.style("opacity", 1).html(`Import: ${d3.format(".2s")(d.importsval)}`))
+        .on("mousemove", e => tooltip.style("left", (e.pageX+10)+"px").style("top", (e.pageY-20)+"px"))
+        .on("mouseout", () => tooltip.style("opacity", 0));
+
+    // Axes
+    svg.append("g").attr("transform", `translate(0,${height - margin.bottom})`)
+       .call(d3.axisBottom(x).tickFormat(d => d3.format(".2s")(Math.abs(d))));
+    svg.append("g").attr("transform", `translate(${x(0)},0)`).call(d3.axisLeft(y).tickSize(0).tickPadding(10));
 }
 
 // Tab handling
 document.getElementById('water-tab').addEventListener('shown.bs.tab', updateWaterfall);
 document.getElementById('bar-tab').addEventListener('shown.bs.tab', updateChart);
-
-<script src="./script.js"></script>
-<script src="./script.js_v2jakob"></script>
