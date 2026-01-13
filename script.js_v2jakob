@@ -1,9 +1,24 @@
-
 // DISCLAIMER: 
 // (1) Code was adapted from the tutorial on TUWEL.
 // (2) MC Copilot was used for code generation. I have experience with similar tools (R shiny) and understand what I can create with that,
 //     however I do not understand js in such a way that I could translate without support.
 // (3) Plot design, layout, interaction methods etc I chose.
+
+// At top of script.js
+window.vizState = {
+    selectedCountry: "Austria",
+    selectedYear: 2012,
+    selectedContinent: "Europe",
+    data: null
+};
+
+function updateAllPlots() {
+    // These calls ensure that when the year changes, 
+    // every teammate's visualization updates at once.
+    if (typeof updateMap === "function") updateMap();
+    if (typeof updateWaterfall === "function") updateWaterfall(); 
+    if (typeof updateBubble === "function") updateBubble();
+}
 
 const parseTime = d3.timeParse("%Y");
 
