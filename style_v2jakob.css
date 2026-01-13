@@ -1,0 +1,31 @@
+body {
+  font-family: 'Arial', sans-serif; 
+}
+
+.responsive-svg-container {
+  margin-right: auto;
+  margin-left: auto;
+  width: 100%;
+  max-width: 1000px;
+}
+#bar { height: 100% !important; }
+.card-body { display: block !important; }
+
+/* Ensure D3 containers fill their Bootstrap cards */
+.plot-container {
+    width: 100%;
+    background-color: #ffffff;
+    overflow: hidden;
+}
+
+/* Make sure the map and bars don't overlap on small screens */
+svg {
+    display: block;
+    max-width: 100%;
+    height: auto;
+}
+
+/* Tooltip must be on top of everything else */
+#tooltip {
+    z-index: 2000 !important;
+}
