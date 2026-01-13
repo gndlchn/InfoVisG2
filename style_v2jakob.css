@@ -1,31 +1,92 @@
+/* 1. GENERAL LAYOUT */
 body {
-  font-family: 'Arial', sans-serif; 
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f4f7f6;
+    color: #333;
+    margin: 0;
+    padding: 0;
 }
 
-.responsive-svg-container {
-  margin-right: auto;
-  margin-left: auto;
-  width: 100%;
-  max-width: 1000px;
-}
-#bar { height: 100% !important; }
-.card-body { display: block !important; }
-
-/* Ensure D3 containers fill their Bootstrap cards */
+/* 2. PLOT CONTAINERS */
 .plot-container {
     width: 100%;
     background-color: #ffffff;
-    overflow: hidden;
+    /* Allows the bar chart to scroll if there are many countries */
+    overflow-y: auto; 
+    overflow-x: hidden;
+    min-height: 400px;
 }
 
-/* Make sure the map and bars don't overlap on small screens */
+/* Makes the SVG responsive within its parent card */
 svg {
     display: block;
-    max-width: 100%;
+    width: 100%;
     height: auto;
+    shape-rendering: geometricPrecision;
 }
 
-/* Tooltip must be on top of everything else */
+/* 3. BAR CHART SPECIFICS */
+/* Adds a subtle transition when hovering over bars */
+rect.export, rect.import {
+    transition: opacity 0.2s;
+    cursor: pointer;
+}
+
+rect.export:hover, rect.import:hover {
+    opacity: 0.8;
+}
+
+/* Center the horizontal line (y-axis) of the diverging chart */
+.domain {
+    stroke: #888;
+}
+
+/* 4. TOOLTIP STYLING */
 #tooltip {
+    position: absolute;
+    opacity: 0; /* Hidden by default */
+    background: rgba(255, 255, 255, 0.95);
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 10px;
+    font-size: 14px;
+    pointer-events: none; /* Crucial: stops tooltip from flickering */
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
     z-index: 2000 !important;
+    min-width: 120px;
+}
+
+#tooltip strong {
+    color: #333;
+    display: block;
+    margin-bottom: 2px;
+}
+
+/* 5. BOOTSTRAP ADJUSTMENTS */
+.card {
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    border: none;
+    margin-bottom: 1.5rem;
+}
+
+.card-header {
+    background-color: #fff;
+    font-weight: bold;
+    border-bottom: 1px solid #eee;
+}
+
+.nav-tabs .nav-link {
+    color: #555;
+}
+
+.nav-tabs .nav-link.active {
+    font-weight: bold;
+    border-bottom-color: #fff;
+}
+
+/* 6. RESPONSIVE UTILITIES */
+@media (max-width: 768px) {
+    .col-sm-3, .col-sm-9 {
+        width: 100%;
+    }
 }
