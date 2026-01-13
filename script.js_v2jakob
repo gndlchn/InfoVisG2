@@ -4,9 +4,7 @@
 //     however I do not understand js in such a way that I could translate without support.
 // (3) Plot design, layout, interaction methods etc I chose.
 
-
-
-// 1. GLOBAL STATE - The "Brain" of the dashboard
+// 1. GLOBAL STATE
 window.vizState = {
     selectedCountry: "Austria",
     selectedYear: 2012,
@@ -15,16 +13,13 @@ window.vizState = {
 };
 
 // 2. CENTRAL UPDATE FUNCTION
-// This runs whenever a filter or the map is clicked
 function updateAllPlots() {
-    // Update the Year label in the HTML
     const yearLabel = document.getElementById("select_year-value");
     if (yearLabel) yearLabel.innerText = window.vizState.selectedYear;
 
-    // Trigger each person's specific draw function
     if (typeof updateMap === "function") updateMap();
     if (typeof updateWaterfall === "function") updateWaterfall();
-    if (typeof updateChart === "function") updateChart(); // This is your Bar Chart
+    if (typeof updateChart === "function") updateChart(); 
 }
 
 // 3. DATA LOADING
@@ -39,7 +34,6 @@ d3.text("./merged(2).csv").then(raw => {
 
     window.vizState.data = data;
 
-    // EVENT LISTENERS
     document.getElementById("select_continent").addEventListener("change", (e) => {
         window.vizState.selectedContinent = e.target.value;
         updateAllPlots();
@@ -50,11 +44,10 @@ d3.text("./merged(2).csv").then(raw => {
         updateAllPlots();
     });
 
-    // Initial Draw
     updateAllPlots();
 });
 
-// 4. YOUR BAR CHART LOGIC (Task 5)
+// 4. BAR CHART LOGIC
 function updateChart() {
     const data = window.vizState.data;
     const selectedRegion = window.vizState.selectedContinent;
@@ -62,49 +55,48 @@ function updateChart() {
 
     if (!data) return;
 
-    // Filter data based on global state
     let newData = data
         .filter(d => (selectedRegion === "All" || d.region === selectedRegion) && d.year === selectedYear)
-        .filter(d => Number.isFinite(d.exportsval) || Number.isFinite(d.importsval))
+        .filter(d => Number.isFinite(d.exportsval) && Number.isFinite(d.importsval))
         .filter(d => d.exportsval > 0 || d.importsval > 0);
 
-    const maxAbs = d3.max(newData, d => Math.max(Math.abs(d.exportsval), Math.abs(d.importsval)));
+    const maxAbs = d3.max(newData, d => Math.max(Math.abs(d.exportsval), Math.abs(d.importsval))) || 1;
 
-    // Target the ID from the README: bar_chart
     d3.select("#bar_chart").selectAll("svg").remove();
-    createVerticalDivergingBarChart(newData, maxAbs);
+    if(newData.length > 0) {
+        createVerticalDivergingBarChart(newData, maxAbs);
+    }
 }
 
 const createVerticalDivergingBarChart = (data, maxAbs) => {
-    // Get width from the parent container to be responsive
     const container = d3.select("#bar_chart").node();
     const width = container ? container.getBoundingClientRect().width : 900;
-    const height = 500;
-    const margins = { top: 20, right: 30, bottom: 100, left: 120 };
+    const height = Math.max(500, data.length * 25); // Responsive height based on data
+    const margins = { top: 20, right: 30, bottom: 60, left: 150 };
 
     const svg = d3.select("#bar_chart")
         .append("svg")
-        .attr("width", "100%")
+        .attr("width", width)
         .attr("height", height);
 
     const yScale = d3.scaleBand()
         .domain(data.map(d => d.country))
         .range([margins.top, height - margins.bottom])
-        .padding(0.5);
+        .padding(0.3);
 
     const xScale = d3.scaleLinear()
         .domain([-maxAbs, maxAbs])
         .range([margins.left, width - margins.right]);
 
-    const colorScale = d3.scaleOrdinal()
-        .domain(["Import", "Export"])
-        .range(["#808080", "#ff6600"]);
-
     const tooltip = d3.select("#tooltip");
-    const chartZOOM = svg.append("g");
+    const chartArea = svg.append("g");
+
+    // Helper to highlight selected country (Linking Task)
+    const getStroke = (d) => d.country === window.vizState.selectedCountry ? "#000" : "none";
+    const getStrokeW = (d) => d.country === window.vizState.selectedCountry ? 2 : 0;
 
     // EXPORT BARS
-    chartZOOM.selectAll("rect.export")
+    chartArea.selectAll("rect.export")
         .data(data)
         .join("rect")
         .attr("class", "export")
@@ -112,64 +104,48 @@ const createVerticalDivergingBarChart = (data, maxAbs) => {
         .attr("x", xScale(0))
         .attr("width", d => Math.abs(xScale(d.exportsval) - xScale(0)))
         .attr("height", yScale.bandwidth())
-        .attr("fill", colorScale("Export"))
+        .attr("fill", "#ff6600")
+        .attr("stroke", getStroke)
+        .attr("stroke-width", getStrokeW)
         .on("mouseover", (event, d) => {
-            tooltip.style("opacity", 1)
-                .html(`<strong>${d.country}</strong><br/>Exports: ${(d.exportsval / 1e9).toFixed(2)} bln.`);
+            tooltip.style("opacity", 1).html(`<strong>${d.country}</strong><br/>Export: ${(d.exportsval / 1e9).toFixed(2)}B`);
         })
         .on("mousemove", (event) => {
-            tooltip.style("left", (event.pageX + 10) + "px")
-                   .style("top", (event.pageY - 20) + "px");
+            tooltip.style("left", (event.pageX + 10) + "px").style("top", (event.pageY - 20) + "px");
         })
         .on("mouseout", () => tooltip.style("opacity", 0));
 
     // IMPORT BARS
-    chartZOOM.selectAll("rect.import")
+    chartArea.selectAll("rect.import")
         .data(data)
         .join("rect")
         .attr("class", "import")
         .attr("y", d => yScale(d.country))
-        .attr("x", d => xScale(-Math.abs(d.importsval)))
-        .attr("width", d => Math.abs(xScale(0) - xScale(Math.abs(d.importsval))))
+        .attr("x", d => xScale(-d.importsval))
+        .attr("width", d => Math.abs(xScale(0) - xScale(-d.importsval)))
         .attr("height", yScale.bandwidth())
-        .attr("fill", colorScale("Import"))
+        .attr("fill", "#808080")
+        .attr("stroke", getStroke)
+        .attr("stroke-width", getStrokeW)
         .on("mouseover", (event, d) => {
-            tooltip.style("opacity", 1)
-                .html(`<strong>${d.country}</strong><br/>Imports: ${(d.importsval / 1e9).toFixed(2)} bln.`);
+            tooltip.style("opacity", 1).html(`<strong>${d.country}</strong><br/>Import: ${(d.importsval / 1e9).toFixed(2)}B`);
         })
         .on("mousemove", (event) => {
-            tooltip.style("left", (event.pageX + 10) + "px")
-                   .style("top", (event.pageY - 20) + "px");
+            tooltip.style("left", (event.pageX + 10) + "px").style("top", (event.pageY - 20) + "px");
         })
         .on("mouseout", () => tooltip.style("opacity", 0));
 
     // AXES
-    const xAxis = d3.axisBottom(xScale)
-        .tickFormat(d => (Math.abs(d) / 1e9) + " bln.");
-
-    chartZOOM.append("g")
+    svg.append("g")
         .attr("transform", `translate(0,${height - margins.bottom})`)
-        .call(xAxis);
+        .call(d3.axisBottom(xScale).tickFormat(d => (Math.abs(d) / 1e9) + "B"));
 
-    chartZOOM.append("g")
-        .attr("transform", `translate(${margins.left},0)`)
-        .call(d3.axisLeft(yScale));
-
-    // ZOOM LOGIC
-    const zoom = d3.zoom()
-        .scaleExtent([1, 10])
-        .translateExtent([[0, 0], [width, height]])
-        .on("zoom", (event) => {
-            chartZOOM.attr("transform", event.transform);
-        });
-
-    svg.call(zoom);
+    svg.append("g")
+        .attr("transform", `translate(${xScale(0)},0)`)
+        .call(d3.axisLeft(yScale).tickSize(0).tickPadding(10));
 };
 
-
-
+// TAB REDRAW FIX
 document.getElementById('bar-tab').addEventListener('shown.bs.tab', function () {
-    updateChart(); // Force redraw once the tab is visible and has width
+    updateChart(); 
 });
-
-
