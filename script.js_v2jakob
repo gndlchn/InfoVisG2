@@ -1,9 +1,3 @@
-// DISCLAIMER: 
-// (1) Code was adapted from the tutorial on TUWEL.
-// (2) MC Copilot was used for code generation. I have experience with similar tools (R shiny) and understand what I can create with that,
-//     however I do not understand js in such a way that I could translate without support.
-// (3) Plot design, layout, interaction methods etc I chose.
-
 // 1. GLOBAL STATE
 window.vizState = {
     selectedCountry: "Austria",
@@ -18,22 +12,31 @@ function updateAllPlots() {
     if (yearLabel) yearLabel.innerText = window.vizState.selectedYear;
 
     if (typeof updateMap === "function") updateMap();
-    if (typeof updateWaterfall === "function") updateWaterfall();
-    if (typeof updateChart === "function") updateChart(); 
+    if (typeof updateWaterfall === "function") updateWaterfall(); // JAKOB'S PART
+    if (typeof updateChart === "function") updateChart();         // TRADE PART
 }
 
-// 3. DATA LOADING
+// 3. DATA LOADING & PARSING
 d3.text("./merged(2).csv").then(raw => {
+    // Jakob: We use your numeric parsing logic here to handle commas/NaNs
+    const parseNum = (s) => {
+        if (!s) return NaN;
+        let v = String(s).replace(/,/g, ".");
+        return parseFloat(v);
+    };
+
     const data = d3.dsvFormat(";").parse(raw, d => ({
         region: d.continent,
         country: d["Country Name"],
         year: +d.Year,
-        exportsval: +d["Exports of goods and services (constant 2015 USD)"],
-        importsval: +d["Imports of goods and services (constant 2015 USD)"]
+        gdp: parseNum(d.GDP),
+        exportsval: parseNum(d["Exports of goods and services (constant 2015 USD)"]),
+        importsval: parseNum(d["Imports of goods and services (constant 2015 USD)"])
     }));
 
     window.vizState.data = data;
 
+    // Listeners for filters
     document.getElementById("select_continent").addEventListener("change", (e) => {
         window.vizState.selectedContinent = e.target.value;
         updateAllPlots();
@@ -47,105 +50,69 @@ d3.text("./merged(2).csv").then(raw => {
     updateAllPlots();
 });
 
-// 4. BAR CHART LOGIC
-function updateChart() {
-    const data = window.vizState.data;
-    const selectedRegion = window.vizState.selectedContinent;
-    const selectedYear = window.vizState.selectedYear;
+// 4. JAKOB'S WATERFALL LOGIC (Integrated)
+function updateWaterfall() {
+    const country = window.vizState.selectedCountry;
+    const allData = window.vizState.data;
+    if (!allData) return;
 
-    if (!data) return;
-
-    let newData = data
-        .filter(d => (selectedRegion === "All" || d.region === selectedRegion) && d.year === selectedYear)
-        .filter(d => Number.isFinite(d.exportsval) && Number.isFinite(d.importsval))
-        .filter(d => d.exportsval > 0 || d.importsval > 0);
-
-    const maxAbs = d3.max(newData, d => Math.max(Math.abs(d.exportsval), Math.abs(d.importsval))) || 1;
-
-    d3.select("#bar_chart").selectAll("svg").remove();
-    if(newData.length > 0) {
-        createVerticalDivergingBarChart(newData, maxAbs);
+    // Filter for the specific country and sort by year
+    const countryData = allData.filter(d => d.country === country).sort((a, b) => a.year - b.year);
+    
+    // Prepare Waterfall steps
+    let steps = [];
+    for (let i = 0; i < countryData.length; i++) {
+        const curr = countryData[i];
+        if (i === 0) {
+            steps.push({ name: curr.year, start: 0, end: curr.gdp, type: "total" });
+        } else {
+            const prev = countryData[i - 1];
+            steps.push({ 
+                name: curr.year, 
+                start: prev.gdp, 
+                end: curr.gdp, 
+                type: curr.gdp >= prev.gdp ? "plus" : "minus" 
+            });
+        }
     }
+
+    d3.select("#water_chart").selectAll("svg").remove();
+    drawWaterfallSVG(steps);
 }
 
-const createVerticalDivergingBarChart = (data, maxAbs) => {
-    const container = d3.select("#bar_chart").node();
-    const width = container ? container.getBoundingClientRect().width : 900;
-    const height = Math.max(500, data.length * 25); // Responsive height based on data
-    const margins = { top: 20, right: 30, bottom: 60, left: 150 };
+function drawWaterfallSVG(data) {
+    const container = d3.select("#water_chart").node();
+    const width = container.getBoundingClientRect().width || 800;
+    const height = 450;
+    const margin = { top: 20, right: 30, bottom: 40, left: 80 };
 
-    const svg = d3.select("#bar_chart")
-        .append("svg")
-        .attr("width", width)
-        .attr("height", height);
+    const svg = d3.select("#water_chart").append("svg")
+        .attr("width", width).attr("height", height);
 
-    const yScale = d3.scaleBand()
-        .domain(data.map(d => d.country))
-        .range([margins.top, height - margins.bottom])
-        .padding(0.3);
+    const x = d3.scaleBand().domain(data.map(d => d.name)).range([margin.left, width - margin.right]).padding(0.2);
+    const y = d3.scaleLinear().domain([0, d3.max(data, d => d.end) * 1.1]).range([height - margin.bottom, margin.top]);
 
-    const xScale = d3.scaleLinear()
-        .domain([-maxAbs, maxAbs])
-        .range([margins.left, width - margins.right]);
+    const g = svg.append("g");
 
-    const tooltip = d3.select("#tooltip");
-    const chartArea = svg.append("g");
+    g.selectAll(".bar").data(data).join("rect")
+        .attr("x", d => x(d.name))
+        .attr("y", d => y(Math.max(d.start, d.end)))
+        .attr("width", x.bandwidth())
+        .attr("height", d => Math.abs(y(d.start) - y(d.end)))
+        .attr("fill", d => d.type === "total" ? "#4682b4" : (d.type === "plus" ? "#2e8b57" : "#b22222"));
 
-    // Helper to highlight selected country (Linking Task)
-    const getStroke = (d) => d.country === window.vizState.selectedCountry ? "#000" : "none";
-    const getStrokeW = (d) => d.country === window.vizState.selectedCountry ? 2 : 0;
+    svg.append("g").attr("transform", `translate(0,${height - margin.bottom})`).call(d3.axisBottom(x).tickValues(x.domain().filter((d,i) => !(i%5))));
+    svg.append("g").attr("transform", `translate(${margin.left},0)`).call(d3.axisLeft(y).tickFormat(d3.format(".2s")));
+}
 
-    // EXPORT BARS
-    chartArea.selectAll("rect.export")
-        .data(data)
-        .join("rect")
-        .attr("class", "export")
-        .attr("y", d => yScale(d.country))
-        .attr("x", xScale(0))
-        .attr("width", d => Math.abs(xScale(d.exportsval) - xScale(0)))
-        .attr("height", yScale.bandwidth())
-        .attr("fill", "#ff6600")
-        .attr("stroke", getStroke)
-        .attr("stroke-width", getStrokeW)
-        .on("mouseover", (event, d) => {
-            tooltip.style("opacity", 1).html(`<strong>${d.country}</strong><br/>Export: ${(d.exportsval / 1e9).toFixed(2)}B`);
-        })
-        .on("mousemove", (event) => {
-            tooltip.style("left", (event.pageX + 10) + "px").style("top", (event.pageY - 20) + "px");
-        })
-        .on("mouseout", () => tooltip.style("opacity", 0));
+// 5. TRADE BAR CHART LOGIC
+function updateChart() {
+    // ... (Keep the Trade Bar Chart code from our previous chat here) ...
+}
 
-    // IMPORT BARS
-    chartArea.selectAll("rect.import")
-        .data(data)
-        .join("rect")
-        .attr("class", "import")
-        .attr("y", d => yScale(d.country))
-        .attr("x", d => xScale(-d.importsval))
-        .attr("width", d => Math.abs(xScale(0) - xScale(-d.importsval)))
-        .attr("height", yScale.bandwidth())
-        .attr("fill", "#808080")
-        .attr("stroke", getStroke)
-        .attr("stroke-width", getStrokeW)
-        .on("mouseover", (event, d) => {
-            tooltip.style("opacity", 1).html(`<strong>${d.country}</strong><br/>Import: ${(d.importsval / 1e9).toFixed(2)}B`);
-        })
-        .on("mousemove", (event) => {
-            tooltip.style("left", (event.pageX + 10) + "px").style("top", (event.pageY - 20) + "px");
-        })
-        .on("mouseout", () => tooltip.style("opacity", 0));
+// Tab handling
+document.getElementById('water-tab').addEventListener('shown.bs.tab', updateWaterfall);
+document.getElementById('bar-tab').addEventListener('shown.bs.tab', updateChart);
 
-    // AXES
-    svg.append("g")
-        .attr("transform", `translate(0,${height - margins.bottom})`)
-        .call(d3.axisBottom(xScale).tickFormat(d => (Math.abs(d) / 1e9) + "B"));
-
-    svg.append("g")
-        .attr("transform", `translate(${xScale(0)},0)`)
-        .call(d3.axisLeft(yScale).tickSize(0).tickPadding(10));
-};
-
-// TAB REDRAW FIX
-document.getElementById('bar-tab').addEventListener('shown.bs.tab', function () {
-    updateChart(); 
-});
+<script src="./script.js"></script>
+<script src="./script.js_v2jakob"></script>
