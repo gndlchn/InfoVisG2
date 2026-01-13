@@ -165,3 +165,10 @@ const createVerticalDivergingBarChart = (data, maxAbs) => {
 
     svg.call(zoom);
 };
+
+
+
+// Add this at the very bottom of script.js
+document.getElementById('bar-tab').addEventListener('shown.bs.tab', function () {
+    updateChart(); // Force redraw once the tab is visible and has width
+});
