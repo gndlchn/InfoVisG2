@@ -5,6 +5,8 @@
 
 * year slider id: select_year
 * continent drop down id: select_continent
+* country dropdown: select_country
+
 Plot IDs:
 * map: map_chart
 * bubble: bubble_chart
