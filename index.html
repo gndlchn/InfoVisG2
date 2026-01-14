@@ -43,7 +43,9 @@
       <div class="col-sm-6">
         <div class="card mb-3">
           <div class="card-body">
-            Click on the map or use the filters on the left to select a country
+            This dashboard allows an exploratory analysis of global economic trends, 
+            specifically the interactions of GDP growth and various other macroeconomic variables. 
+            <br>Click on the map or use the filters to select a country, the plots below show key metrics.
           </div>
         </div>
       </div>
@@ -53,12 +55,19 @@
     <div class="row mb-3">
       <div class="col-sm-3">
         <div class="card">
-          <div class="card-body">indicator filter</div>
+          <div class="card-body">The color on the map indicates movement of wealth. All countries are 
+            ranked by their annual GDP and then binned. The darker colors equal higher GDP. Use the slider
+            below the map to see changes over the years.
+            <br><br>
+            Hover over a country to see the GDP value, and click on in to see key metrics below.
+            <br><br>
+            For countries colored gray no data is available for the selected year. 
+          </div>
         </div>
       </div>
       <div class="col-sm-9">
         <div class="card text-center">
-          <div class="card-body" style="padding: 0px;">
+          <div class="card-body" style="padding: 0px;height: 100%; min-height: 400px;">
               <div id="map_chart" class="responsive-svg-container" style="min-height: 100%; width: 100%"></div>
           </div>
         </div>
@@ -78,7 +87,7 @@
               type="button"
               role="tab"
             >
-              Evolution of GDP for *country*
+              Evolution of GDP
             </button>
           </li>
           <li class="nav-item" role="presentation">
@@ -124,7 +133,7 @@
                 </div>
               </div>
               <div class="col-sm-3">
-                A short explanation about the plot 1
+                This chart shows annual absolute changes of GDP for a country. This way, the growth path becomes visible and each country's trajectory over time can be seen in detail.
               </div>
             </div>
           </div>
@@ -145,7 +154,9 @@
                 </div>
               </div>
               <div class="col-sm-3">
-                A short explanation about the plot 2
+                 By plotting Foreign Direct Investment (attractiveness to capital) against Trade (reliance on exchange), this chart reveals distinct economic archetypes. 
+                 <br><br>
+                 Including GDP Purchasing Power Parity as bubble size adds a layer of reality, showing actual economic weight versus relative percentages.
               </div>
             </div>
           </div>
@@ -166,7 +177,9 @@
                 </div>
               </div>
               <div class="col-sm-3">
-                A short explanation about the plot 3
+                This chart allows to compare whether a country relies heavily on import or export or has a trading balance. 
+                <br><br>
+                By giving the context of countries on the same continent comparison of economic strength is possible. 
               </div>
             </div>
           </div>
@@ -177,6 +190,20 @@
         <div class="row mb-3">
           <div class="card">
             <div class="card-body">
+               <div class="mb-3">
+                <label class="form-label" for="slider-wrapper">Year</label>
+                <div class="slider-wrapper"> 
+                  <input type="range" 
+                    class="form-range" 
+                    id="select_year" 
+                    min="2010" 
+                    max="2020" 
+                    tep="1" 
+                    value="2012" 
+                    /> 
+                  <div id="slider-popup" class="slider-popup"></div> 
+                </div>
+              </div>
               <div class="mb-3">
                 <label class="form-label" for="select_continent">Continent</label>
                 <select class="form-select" id="select_continent">
@@ -194,20 +221,7 @@
                   <option value="" disabled selected>Select a country</option> 
                 </select> 
               </div>
-              <div class="mb-3">
-                <label class="form-label" for="slider-wrapper">Year</label>
-                <div class="slider-wrapper"> 
-                  <input type="range" 
-                    class="form-range" 
-                    id="select_year" 
-                    min="2010" 
-                    max="2020" 
-                    tep="1" 
-                    value="2012" 
-                    /> 
-                  <div id="slider-popup" class="slider-popup"></div> 
-                </div>
-              </div>
+
 
             </div>
             </div>
