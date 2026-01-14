@@ -1,6 +1,7 @@
 const state = {
   year: 2012,
-  continent: "Europe"
+  continent: "Europe",
+  country: ""
 };
 
 function initFilters() {

@@ -144,8 +144,8 @@
         d3.format(".3s")(d).replace("G", "B");
 
       function update() {
-        const year = +yearSelect.property("value");
-        const region = regionSelect.property("value");
+        const year = state.year;
+        const region = state.continent;
 
         const filtered = data.filter(d =>
           d.year === year &&

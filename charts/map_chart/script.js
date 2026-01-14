@@ -1,164 +1,78 @@
-
-
-const parseTime = d3.timeParse("%Y");
+// 1. Global Variables to keep track of the chart state
 let gdpByCountryYear;
-
-Promise.all([ 
-  d3.text("./merged.csv"), 
-  d3.json("./countries-110m.json") ]).then(([raw, world]) => {
-    
-    const data = d3.dsvFormat(";").parse(raw, d => ({ // since merged(2).csv has ";" delimiter
-      region: d.continent,
-      country: d["Country Name"],
-      year: +d.Year, //numeric
-      gdp: +d["GDP"],
-      exportsval: +d["Exports of goods and services (constant 2015 USD)"],//numeric
-      importsval: +d["Imports of goods and services (constant 2015 USD)"]//numeric
-    }));
-
-    const countries = topojson.feature(world, world.objects.countries).features; // Build lookup: country → year → GDP 
-    
-    const csvNames = new Set(data.map(d => d.country.trim())); 
-    const jsonNames = new Set(countries.map(d => d.properties.name.trim()));
-    const missingInCSV = [...jsonNames].filter(name => !csvNames.has(name));
-    console.log("Countries in TopoJSON but NOT in CSV:", missingInCSV);
-
-    const missingInJSON = [...csvNames].filter(name => !jsonNames.has(name));
-    console.log("Countries in CSV but NOT in TopoJSON:", missingInJSON);
-
-
-
-
-
-    gdpByCountryYear = d3.group(data, d => d.country, d => d.year); 
-    const gdpValues = data 
-      .filter(d => d.year >= 2010 && d.year <= 2020) 
-      .map(d => d.gdp)
-      .filter(v => Number.isFinite(v));
-    const gdpMin = d3.min(gdpValues);
-    const gdpMax = d3.max(gdpValues);
-
-    // mapColor = d3.scaleSequentialLog()
-    //   .domain([gdpMin, gdpMax])
-    //   .interpolator(d3.interpolateBlues);
-    mapColor = d3.scaleQuantile() 
-      .domain(gdpValues) 
-      .range(d3.schemeBlues[7])
-
-
-    drawMap(countries, gdpByCountryYear); 
-    
-    updateMap(+document.getElementById("select_year").value); 
-
-    document.getElementById("select_year") 
-      .addEventListener("input", e => updateMap(+e.target.value));
-
-
-  // FIX: build lookup here 
-    const continentToCountries = d3.group(data, d => d.region); // FIX: define updateCountrySelect here so it can see continentToCountries 
-    
-    function updateCountrySelect(continent) {
-      const countrySelect = document.getElementById("select_country");
-
-      // Clear old options
-      countrySelect.innerHTML = "";
-
-      const countries = continentToCountries.get(continent);
-      if (!countries) return;
-
-      // Add placeholder
-      const placeholder = document.createElement("option");
-      placeholder.textContent = "Select a country";
-      placeholder.disabled = true;
-      placeholder.selected = true;
-      countrySelect.appendChild(placeholder);
-
-      // Add new options
-      const uniqueCountries = Array.from(new Set(countries.map(d => d.country)));
-      uniqueCountries.forEach(country => {
-        const opt = document.createElement("option");
-        opt.value = country;
-        opt.textContent = country;
-        countrySelect.appendChild(opt);
-      });
-
-      countrySelectTS.clear();      // clears selection
-      countrySelectTS.clearOptions(); // clears internal options
-      countrySelectTS.addOption(
-        uniqueCountries.map(c => ({ value: c, text: c }))
-      );
-      countrySelectTS.refreshOptions(false);
-    }
-
-    
-      
-    document.getElementById("select_continent") 
-      .addEventListener("change", e => updateCountrySelect(e.target.value)); 
-      
-    const countrySelectTS = new TomSelect("#select_country", { 
-      create: false, 
-      sortField: "text", 
-      placeholder: "Type to search..."
-    });
-
-    updateCountrySelect(document.getElementById("select_continent").value); 
-
-    // updateChart(data); //when filter is changed, chart gets calculated again with new values
-    document.getElementById("select_continent").addEventListener("change", () => updateChart(data)); //update chart with new region when selected
-    document.getElementById("select_year").addEventListener("change", () => updateChart(data));//update chart with new year when selected
-    
-    const continentSelect = document.getElementById("select_continent");
-
-
-    continentSelect.addEventListener("change", () => {
-    updateCountrySelect(continentSelect.value);
-    });
-
-
-
-    console.log(d3.min(gdpValues));
-    console.log(gdpMax);
-    // console.log(data); //check if it works
-    return data; //return so that newData can be created from data
-})
-
-
-const slider = document.getElementById("select_year");
-const popup = document.getElementById("slider-popup");
-
-function updatePopup() {
-  const min = +slider.min;
-  const max = +slider.max;
-  const val = +slider.value;
-
-  // position as percentage
-  const percent = (val - min) / (max - min);
-
-  // update text
-  popup.textContent = val;
-
-  // move bubble
-  popup.style.left = `calc(${percent * 100}% )`;
-}
-
-slider.addEventListener("input", updatePopup);
-updatePopup(); 
-
-
 let mapSvg, mapColor, mapPath;
+let worldData; // To store TopoJSON features
 
-function drawMap(countries, gdpLookup) {
+/**
+ * Main function called by dashboard.js to render or update the Map
+ * @param {string} containerId - The CSS selector for the container (e.g., "#map_chart")
+ * @param {object} state - The global dashboard state { year, continent, country }
+ */
+window.renderMapChart = function(containerId, state) {
+  
+  // INITIALIZATION: If gdpByCountryYear is undefined, we need to load data and draw the map for the first time
+  if (!gdpByCountryYear) {
+    Promise.all([ 
+      d3.text("data/merged.csv"), 
+      // Using CDN for world atlas if local file is missing
+      d3.json("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json") 
+    ]).then(([raw, world]) => {
+        
+        // Data Parsing
+        const data = d3.dsvFormat(";").parse(raw, d => ({
+          region: d.continent,
+          country: d["Country Name"],
+          year: +d.Year,
+          gdp: +d["GDP"]
+        }));
+
+        // Group data for quick lookup: [CountryName][Year]
+        gdpByCountryYear = d3.group(data, d => d.country, d => d.year); 
+
+        // Extract country features from TopoJSON
+        worldData = topojson.feature(world, world.objects.countries).features;
+
+        // Setup Color Scale based on all GDP values from 2010-2020
+        const gdpValues = data 
+          .filter(d => d.year >= 2010 && d.year <= 2020) 
+          .map(d => d.gdp)
+          .filter(v => Number.isFinite(v));
+
+        mapColor = d3.scaleQuantile() 
+          .domain(gdpValues) 
+          .range(d3.schemeBlues[7]);
+
+        // Draw the static elements of the map
+        drawMap(worldData, containerId); 
+        
+        // Apply initial colors based on the current state's year
+        updateMap(state.year); 
+    }).catch(err => {
+        console.error("Error loading map data:", err);
+    });
+  } 
+  // UPDATE: If the map already exists, just update the colors for the new year
+  else if (mapSvg) {
+    updateMap(state.year);
+  }
+};
+
+/**
+ * Creates the SVG and draws the country paths
+ */
+function drawMap(countries, containerId) {
   const width = 900; 
   const height = 500;
 
+  // Ensure container is empty before appending
+  d3.select(containerId).selectAll("*").remove();
 
-  mapSvg = d3.select("#map_chart")
+  mapSvg = d3.select(containerId)
     .append("svg")
     .attr("width", "100%")
     .attr("height", "100%")
     .attr("preserveAspectRatio", "xMidYMid meet")
     .attr("viewBox", `0 0 ${width} ${height}`);
-
 
   const projection = d3.geoNaturalEarth1()
     .scale(160)
@@ -168,10 +82,9 @@ function drawMap(countries, gdpLookup) {
   
   const tooltip = d3.select("#map-tooltip");
 
+  const g = mapSvg.append("g").attr("class", "countries");
 
-  mapSvg.append("g")
-    .attr("class", "countries")
-    .selectAll("path")
+  g.selectAll("path")
     .data(countries)
     .join("path")
     .attr("d", mapPath)
@@ -192,37 +105,39 @@ function drawMap(countries, gdpLookup) {
       tooltip.style("opacity", 0); 
     });
 
-
+  // Zoom Logic
   const zoom = d3.zoom()
-  .scaleExtent([1, 8])          // how far you can zoom
-  .translateExtent([[0, 0], [width, height]]) // limit panning
-  .on("zoom", (event) => {
-    mapSvg.select(".countries")
-      .attr("transform", event.transform);
-  });
+    .scaleExtent([1, 8])
+    .translateExtent([[0, 0], [width, height]])
+    .on("zoom", (event) => {
+      g.attr("transform", event.transform);
+    });
 
-mapSvg.call(zoom);
-
+  mapSvg.call(zoom);
 }
 
+/**
+ * Updates country colors based on the year
+ */
 function updateMap(year) {
+  if (!mapSvg) return;
+
   mapSvg.selectAll("path")
     .transition()
     .duration(300)
     .attr("fill", d => {
-      let name = d.properties.name.trim();
-
+      const name = d.properties.name.trim();
       const mappedName = nameMap[name] || name;
-
       const gdpEntry = gdpByCountryYear.get(mappedName)?.get(year);
 
-      if (!gdpEntry || !gdpEntry[0].gdp) return "#ddd";
+      // Check if data exists for this country/year
+      if (!gdpEntry || !gdpEntry[0] || !gdpEntry[0].gdp) return "#ddd";
 
       return mapColor(gdpEntry[0].gdp);
     });
 }
 
-
+// Mapping of TopoJSON names to CSV names
 const nameMap = {
   "United States of America": "United States",
   "Russian Federation": "Russia",
@@ -244,8 +159,5 @@ const nameMap = {
   "Türkiye": "Turkey",
   "Myanmar": "Burma",
   "Falkland Is.": "Falkland Islands",
-  "Egypt": "Egypt, Arab Rep.",
-  "eSwatini": "Eswatini",
-  
-
+  "Egypt": "Egypt, Arab Rep."
 };
