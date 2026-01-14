@@ -1,0 +1,158 @@
+function updateChart(data) {
+  const selectedRegion = document.getElementById("select_continent").value; // get key from selectInput
+  const selectedYear = +document.getElementById("select_year").value; // get key from selectInput as numeric value (for filter)
+
+  console.log(data);
+
+  let newData = data
+    .filter(d => d.region === selectedRegion && d.year === selectedYear) //pass selectInput to dataset so that it only shows relevant data
+    .filter(d => Number.isFinite(d.exportsval) || Number.isFinite(d.importsval)) // select only countries where at least one value exists
+    .filter(d => d.exportsval > 0 || d.importsval > 0); // select only countries where at least one value is feasible
+
+  const maxAbs = d3.max(newData, d => Math.max(Math.abs(d.exportsval), Math.abs(d.importsval))) //get max value for symmetrical x axis
+  console.log(newData)
+
+  d3.select("#bar_chart").selectAll("svg").remove(); //clean slate for updating chart
+  createVerticalDivergingBarChart(newData, maxAbs); //plot
+  window.addEventListener("resize", () => { 
+    updateChart(data); 
+    });
+  if (data.length === 0) { d3.select("#bar_chart").html("<p>No data available.</p>"); return; }
+}
+
+const createVerticalDivergingBarChart = (data, maxAbs) => {
+  const container = d3.select("#bar"); 
+  const width = container.node().clientWidth; 
+  const height = container.node().clientHeight; 
+  const margins = { top: 20, right: 30, bottom: 100, left: 120 }; 
+  const svg = container.append("svg") 
+    .attr("width", "100%") 
+    .attr("height", "100%") 
+    .attr("viewBox", `0 0 ${width} ${height}`) 
+    .attr("preserveAspectRatio", "xMidYMid meet");
+
+  const yScale = d3.scaleBand() // band for bars 
+      .domain(data.map(d => d.country)) //display country names on axis
+      .range([margins.top, height - margins.bottom]) // span of axis
+      .padding(0.5); // space on beginning + end of axis 
+
+  const xScale = d3.scaleLinear() // linear for continuous 
+    .domain([-maxAbs, maxAbs]) //center 0
+    .range([margins.left, width - margins.right]); // span of axis
+
+  const colorScale = d3.scaleOrdinal()
+    .domain(["Import","Export"])
+    .range(["#808080", "#ff6600"]);
+
+
+  const tooltip = d3.select("#tooltip"); //access tooltip from html
+  const chartZOOM = svg.append("g"); //to control where zooms happen, differentiate between chartZOOM and svg
+
+  chartZOOM.selectAll("rect.export") //to all bars from export apply:
+      .data(data)
+      .join("rect")
+        .attr("class", "export")
+        .attr("y", d => yScale(d.country)) // y axis is countries
+        .attr("x", xScale(0)) // start from center
+        .attr("width", d => Math.abs( xScale(d.exportsval) - xScale(0))) //length of the bar
+        .attr("height", yScale.bandwidth()) // width of the bar
+        .attr("fill", colorScale("Export")) // colour code
+        .on("mouseover", function(event, d) { // tooltip
+          tooltip
+            .style("opacity", 1) // make visible
+            .html(`<strong>${d.country}</strong><br/>Exports: ${ (Math.abs(d.exportsval) / 1_000_000_000).toFixed(2) + " bln."}`); //show country and rounded value
+        })
+        .on("mousemove", function(event) { //follow along with cursor
+          tooltip
+            .style("left", (event.pageX + 10) + "px")
+            .style("top", (event.pageY - 20) + "px");
+        })
+        .on("mouseout", function() { 
+          tooltip.style("opacity", 0); // make invisible 
+        });
+
+  chartZOOM.selectAll("rect.import")//to all bars from import apply:
+      .data(data)
+      .join("rect")
+        .attr("class", "import")
+        .attr("y", d => yScale(d.country))// y axis is countries
+        .attr("x", d => xScale(-Math.abs(d.importsval)))// start from left
+        .attr("width", d => Math.abs(xScale(0) - xScale(Math.abs(d.importsval)))) // distance to center
+        .attr("height", yScale.bandwidth())
+        .attr("fill", d => colorScale("Import"))
+        .on("mouseover", function(event, d) {
+          tooltip
+            .style("opacity", 1)
+            .html(`<strong>${d.country}</strong><br/>Imports: ${ (Math.abs(d.importsval) / 1_000_000_000).toFixed(2) + " bln."}`);
+        })
+        .on("mousemove", function(event) {
+          tooltip
+            .style("left", (event.pageX + 10) + "px")
+            .style("top", (event.pageY - 20) + "px");
+        })
+        .on("mouseout", function() {
+          tooltip.style("opacity", 0);
+        });
+
+
+  
+    
+  const xAxis = d3.axisBottom(xScale) // make ticks more readable with bln.
+    .tickFormat(d => {return (Math.abs(d) / 1_000_000_000) + " bln."});
+
+  chartZOOM.append("g") 
+    .attr("class", "x-axis")
+    .attr("transform", `translate(0,${height - margins.bottom})`) // position axis at bottom
+    .call(xAxis);// add axis to chart
+
+  const yAxis = d3.axisLeft(yScale);
+
+  chartZOOM.append("g") //append to chartZOOM else remains static
+    .attr("transform", `translate(${margins.left},0)`)// position axis at left
+    .call(yAxis);// add axis to chart
+
+  chartZOOM.append("line") //append to chartZOOM else remains static
+    .attr("x1", xScale(0)) //x start of line
+    .attr("x2", xScale(0)) // x end of line
+    .attr("y1", margins.top) // y start 
+    .attr("y2", height - margins.bottom) // y end
+    .attr("stroke", "#000000") //color
+    .attr("stroke-width", "1");
+
+  const zoom = d3.zoom() //append to chartZOOM else remains static
+    .scaleExtent([1, 10]) // make 10x larger
+    .translateExtent([[0, 0], [width, height]]) //zoom on chartZOOM area
+    .on("zoom", zoomed);
+
+  svg.call(zoom); //zoom when mouse is within svg
+
+  function zoomed(event) {
+    chartZOOM.attr("transform", event.transform);
+  }
+
+
+
+  const legendItems = colorScale.domain(); //names for colours
+  const legend = chartZOOM.append("g") //append to chartZOOM else remains static
+    .attr("class", "legend") // give id in html
+    .attr("transform", `translate(${width/2 -15}, ${height - margins.bottom + 30})`); //translate is position, $ like f string
+
+  legend.selectAll("rect")
+    .data(legendItems)
+    .join("rect")
+      .attr("x", (d, i) => i * 100)  // distance between rects
+      .attr("y", 0)
+      .attr("width", 15)
+      .attr("height", 15)
+      .attr("fill", d => colorScale(d));
+
+  legend.selectAll("text")
+    .data(legendItems)
+    .join("text")
+      .attr("x", (d, i) => i * 100 + 20) // distance between text
+      .attr("y", 12)
+      .text(d => d)
+      .style("font-size", "12px")
+      .style("alignment-baseline", "middle");
+
+};
