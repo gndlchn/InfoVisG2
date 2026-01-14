@@ -1,0 +1,50 @@
+body {
+  background-color: #f5f6f8;
+}
+
+.chart {
+  width: 100%;
+  min-height: 400px;
+}
+
+#map_chart {
+  min-height: 400px;
+}
+
+#water_chart,
+#bubble_chart {
+  min-height: 450px;
+}
+
+#bar_chart {
+  min-height: 500px;
+}
+
+.tooltip {
+  position: absolute;
+  opacity: 0;
+  background: #ffffff;
+  border: 1px solid #cccccc;
+  padding: 6px 8px;
+  font-size: 12px;
+  pointer-events: none;
+  z-index: 2000;
+  border-radius: 4px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+.nav-tabs .nav-link {
+  cursor: pointer;
+}
+
+.card {
+  border-radius: 6px;
+}
+
+.card-header {
+  font-weight: 600;
+}
+
+.tab-content {
+  min-height: 500px;
+}
