@@ -1,5 +1,5 @@
 window.renderBarChart = function(containerId, state) {
-  const margin = { top: 40, right: 30, bottom: 40, left: 180 };
+  const margin = { top: 80, right: 30, bottom: 80, left: 180 };
   const totalWidth = 800;
   // const totalHeight = 400;
   // new
