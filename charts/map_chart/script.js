@@ -1,143 +1,156 @@
-// 1. Global Variables to keep track of the chart state
-let gdpByCountryYear;
-let mapSvg, mapColor, mapPath;
-let worldData; // To store TopoJSON features
+let dataByCountryYear;
+let mapSvg, mapColor, mapPath, worldData;
+let currentIndicator = ""; 
 
 /**
  * Main function called by dashboard.js to render or update the Map
- * @param {string} containerId - The CSS selector for the container (e.g., "#map_chart")
- * @param {object} state - The global dashboard state { year, continent, country }
+ * @param {string} containerId - The CSS selector for the container
+ * @param {object} state - Global state { year, indicator, ... }
+ * @param {string} displayName - Human-readable name of the indicator
  */
-window.renderMapChart = function(containerId, state) {
-  
-  // INITIALIZATION: If gdpByCountryYear is undefined, we need to load data and draw the map for the first time
-  if (!gdpByCountryYear) {
+window.renderMapChart = function(containerId, state, displayName) {
+  if (!dataByCountryYear) {
     Promise.all([ 
       d3.text("data/merged.csv"), 
-      // Using CDN for world atlas if local file is missing
       d3.json("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json") 
     ]).then(([raw, world]) => {
-        
-        // Data Parsing
-        const data = d3.dsvFormat(";").parse(raw, d => ({
-          region: d.continent,
-          country: d["Country Name"],
-          year: +d.Year,
-          gdp: +d["GDP"]
-        }));
-
-        // Group data for quick lookup: [CountryName][Year]
-        gdpByCountryYear = d3.group(data, d => d.country, d => d.year); 
-
-        // Extract country features from TopoJSON
+        const rawData = d3.dsvFormat(";").parse(raw);
+        // Group raw data to support dynamic column switching
+        dataByCountryYear = d3.group(rawData, d => d["Country Name"], d => +d.Year); 
         worldData = topojson.feature(world, world.objects.countries).features;
-
-        // Setup Color Scale based on all GDP values from 2010-2020
-        const gdpValues = data 
-          .filter(d => d.year >= 2010 && d.year <= 2020) 
-          .map(d => d.gdp)
-          .filter(v => Number.isFinite(v));
-
-        mapColor = d3.scaleQuantile() 
-          .domain(gdpValues) 
-          .range(d3.schemeBlues[7]);
-
-        // Draw the static elements of the map
-        drawMap(worldData, containerId); 
         
-        // Apply initial colors based on the current state's year
-        updateMap(state.year); 
-    }).catch(err => {
-        console.error("Error loading map data:", err);
+        drawMap(worldData, containerId, state); 
+        updateMap(state, displayName);
     });
-  } 
-  // UPDATE: If the map already exists, just update the colors for the new year
-  else if (mapSvg) {
-    updateMap(state.year);
+  } else {
+    updateMap(state, displayName);
   }
 };
 
-/**
- * Creates the SVG and draws the country paths
- */
-function drawMap(countries, containerId) {
-  const width = 900; 
-  const height = 500;
-
-  // Ensure container is empty before appending
+function drawMap(countries, containerId, state) {
+  const width = 900, height = 600;
+  const tooltip = d3.select("#chart-tooltip");
   d3.select(containerId).selectAll("*").remove();
 
-  mapSvg = d3.select(containerId)
-    .append("svg")
-    .attr("width", "100%")
-    .attr("height", "100%")
+  mapSvg = d3.select(containerId).append("svg")
+    .attr("viewBox", `0 0 ${width} ${height}`)
     .attr("preserveAspectRatio", "xMidYMid meet")
-    .attr("viewBox", `0 0 ${width} ${height}`);
+    .style("width", "100%")
+    .style("height", "100%");
 
-  const projection = d3.geoNaturalEarth1()
-    .scale(160)
-    .translate([width / 2, height / 2]);
+  // Centered dynamic title
+  mapSvg.append("text")
+    .attr("id", "map-chart-title")
+    .attr("x", width / 2)
+    .attr("y", 35)
+    .attr("text-anchor", "middle")
+    .style("font-size", "22px")
+    .style("font-weight", "bold")
+    .style("font-family", "sans-serif");
 
+  const projection = d3.geoNaturalEarth1().scale(160).translate([width / 2, height / 2 - 20]);
   mapPath = d3.geoPath().projection(projection);
-  
-  const tooltip = d3.select("#map-tooltip");
-
   const g = mapSvg.append("g").attr("class", "countries");
 
-  g.selectAll("path")
-    .data(countries)
-    .join("path")
-    .attr("d", mapPath)
-    .attr("stroke", "#333")
-    .attr("fill", "#ccc")
-    .attr("data-name", d => d.properties.name)
-    .on("mouseover", function (event, d) {
-       d3.select(this).attr("stroke-width", 2); 
-       tooltip.style("opacity", 1) 
-       .html(`<strong>${d.properties.name}</strong>`); 
-    }) 
-    .on("mousemove", function (event) { 
-      tooltip.style("left", (event.pageX + 10) + "px") 
-      .style("top", (event.pageY - 20) + "px"); 
-    }) 
-    .on("mouseout", function () { 
+  g.selectAll("path").data(countries).join("path")
+    .attr("d", mapPath).attr("stroke", "#333").attr("fill", "#ccc")
+    .style("cursor", "pointer") // Visual cue that countries are clickable
+    .on("mouseover", function(event, d) { 
+      d3.select(this).attr("stroke-width", 2); 
+      const name = nameMap[d.properties.name.trim()] || d.properties.name.trim();
+      const entry = dataByCountryYear.get(name)?.get(state.year);
+      const val = entry ? +entry[0][state.indicator] : NaN;
+      const displayVal = (isNaN(val) || val === 0) ? "No data" : d3.format(".2s")(val);
+
+      tooltip.style("opacity", 1)
+             .html(`<strong>${name}</strong><br>${state.indicator}: ${displayVal}`);
+    })
+    .on("mousemove", function(event) {
+      tooltip.style("left", (event.pageX + 10) + "px")
+             .style("top", (event.pageY - 10) + "px");
+    })
+    .on("mouseout", function() { 
       d3.select(this).attr("stroke-width", 1); 
-      tooltip.style("opacity", 0); 
+      tooltip.style("opacity", 0);
+    })
+    .on("click", function(event, d) {
+      const name = nameMap[d.properties.name.trim()] || d.properties.name.trim();
+      const countryDataMap = dataByCountryYear.get(name);
+      
+      if (countryDataMap) {
+        // Find the continent for this country from the data
+        const firstYearEntry = countryDataMap.values().next().value[0];
+        const continent = firstYearEntry.continent;
+        
+        // Update global filters and refresh all charts
+        if (typeof window.updateFilters === "function") {
+          window.updateFilters(name, continent);
+        }
+      }
     });
 
-  // Zoom Logic
-  const zoom = d3.zoom()
-    .scaleExtent([1, 8])
-    .translateExtent([[0, 0], [width, height]])
-    .on("zoom", (event) => {
-      g.attr("transform", event.transform);
-    });
-
-  mapSvg.call(zoom);
+  mapSvg.append("g").attr("id", "map-legend-group");
 }
 
-/**
- * Updates country colors based on the year
- */
-function updateMap(year) {
+function updateMap(state, displayName) {
   if (!mapSvg) return;
 
-  mapSvg.selectAll("path")
-    .transition()
-    .duration(300)
+  // Update dynamic title text
+  mapSvg.select("#map-chart-title")
+    .text(`${displayName} by country in ${state.year}`);
+
+  // Rebuild color scale and legend if the indicator changes
+  if (currentIndicator !== state.indicator) {
+    currentIndicator = state.indicator;
+    
+    const allValues = [];
+    dataByCountryYear.forEach(years => {
+      years.forEach(entries => {
+        const val = +entries[0][currentIndicator];
+        if (!isNaN(val) && val !== 0) allValues.push(val);
+      });
+    });
+
+    mapColor = d3.scaleQuantile().domain(allValues).range(d3.schemeBlues[7]);
+    updateLegend(displayName); 
+  }
+
+  mapSvg.selectAll("path").transition().duration(300)
     .attr("fill", d => {
-      const name = d.properties.name.trim();
-      const mappedName = nameMap[name] || name;
-      const gdpEntry = gdpByCountryYear.get(mappedName)?.get(year);
-
-      // Check if data exists for this country/year
-      if (!gdpEntry || !gdpEntry[0] || !gdpEntry[0].gdp) return "#ddd";
-
-      return mapColor(gdpEntry[0].gdp);
+      const name = nameMap[d.properties.name.trim()] || d.properties.name.trim();
+      const entry = dataByCountryYear.get(name)?.get(state.year);
+      const val = entry ? +entry[0][currentIndicator] : NaN;
+      // Handle missing or zero data with a neutral gray
+      return (isNaN(val) || val === 0) ? "#ddd" : mapColor(val);
     });
 }
 
-// Mapping of TopoJSON names to CSV names
+function updateLegend(title) {
+  const g = d3.select("#map-legend-group");
+  g.selectAll("*").remove();
+  
+  const width = 900, legendWidth = 240, legendHeight = 12;
+  const xOffset = (width - legendWidth) / 2;
+  const yOffset = 550; // Shifted slightly further down to avoid map overlap
+
+  const legend = g.append("g").attr("transform", `translate(${xOffset}, ${yOffset})`);
+
+  // Legend labels
+  legend.append("text").attr("x", legendWidth / 2).attr("y", -15)
+    .attr("text-anchor", "middle").style("font-size", "12px").style("font-family", "sans-serif")
+    .style("fill", "black").text(title);
+
+  legend.selectAll("rect").data(d3.schemeBlues[7]).join("rect")
+    .attr("x", (d, i) => i * (legendWidth / 7)).attr("width", legendWidth / 7)
+    .attr("height", legendHeight).attr("fill", d => d).attr("stroke", "#555").attr("stroke-width", 0.5);
+
+  legend.append("text").attr("x", 0).attr("y", legendHeight + 20)
+    .style("font-size", "12px").style("font-family", "sans-serif").style("fill", "black").text("Lower Values");
+  
+  legend.append("text").attr("x", legendWidth).attr("y", legendHeight + 20)
+    .attr("text-anchor", "end").style("font-size", "12px").style("font-family", "sans-serif").style("fill", "black").text("Higher Values");
+}
+
 const nameMap = {
   "United States of America": "United States",
   "Russian Federation": "Russia",
@@ -154,10 +167,5 @@ const nameMap = {
   "Bolivia (Plurinational State of)": "Bolivia",
   "Venezuela (Bolivarian Republic of)": "Venezuela",
   "Brunei Darussalam": "Brunei",
-  "Cabo Verde": "Cape Verde",
-  "Eswatini": "Swaziland",
-  "Türkiye": "Turkey",
-  "Myanmar": "Burma",
-  "Falkland Is.": "Falkland Islands",
   "Egypt": "Egypt, Arab Rep."
 };

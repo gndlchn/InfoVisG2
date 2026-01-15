@@ -1,231 +1,197 @@
 (function () {
-
-  const margin = { top: 40, right: 160, bottom: 80, left: 80 };
-  const width = 1100 - margin.left - margin.right;
-  const height = 520 - margin.top - margin.bottom;
+  const margin = { top: 80, right: 30, bottom: 80, left: 60 };
+  const totalWidth = 800;
+  const totalHeight = 400;
+  const width = totalWidth - margin.left - margin.right;
+  const height = totalHeight - margin.top - margin.bottom;
 
   function parseNum(s) {
     if (s === undefined || s === null) return NaN;
-    let v = String(s).trim();
-    if (v === "" || v.toLowerCase() === "nan") return NaN;
-    v = v.replace(/\s/g, "").replace(/,/g, ".");
-    v = v.replace(/[^0-9eE+.\-]/g, "");
-    const n = parseFloat(v);
+    let v = String(s).trim().replace(/\s/g, "").replace(/,/g, ".");
+    const n = parseFloat(v.replace(/[^0-9eE+.\-]/g, ""));
     return isFinite(n) ? n : NaN;
   }
 
-  function renderWaterChart(containerId) {
-
+  function renderWaterChart(containerId, state, displayName) {
     const container = d3.select(containerId);
+    const tooltip = d3.select("#chart-tooltip");
     container.selectAll("*").remove();
 
-    const layout = container
-      .append("div")
-      .attr("class", "waterfall-layout");
-
-    const controls = layout
-      .append("div")
-      .attr("class", "waterfall-controls");
-
-    controls.append("label")
-      .text("Country");
-
-    const select = controls.append("select")
-      .attr("size", 8);
-
-    const resetBtn = controls.append("button")
-      .text("Reset View");
-
-    const card = layout
-      .append("div")
-      .attr("class", "waterfall-card");
-
-    const svg = card.append("svg")
-      .attr("viewBox", `0 0 ${width + margin.left + margin.right} ${height + margin.top + margin.bottom}`)
+    const svgRoot = container.append("svg")
+      .attr("viewBox", `0 0 ${totalWidth} ${totalHeight}`)
       .attr("preserveAspectRatio", "xMidYMid meet");
 
-    const g = svg.append("g")
-      .attr("transform", `translate(${margin.left},${margin.top})`);
+    // Centered dynamic title
+    const title = svgRoot.append("text")
+      .attr("x", totalWidth / 2)
+      .attr("y", 40)
+      .attr("text-anchor", "middle")
+      .style("font-size", "20px")
+      .style("font-weight", "bold")
+      .style("font-family", "sans-serif");
 
-    const chartG = g.append("g");
-    const xAxisG = g.append("g").attr("transform", `translate(0,${height})`);
+    const g = svgRoot.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+    // --- 1. DEFINITIONS (Clips) ---
+    const defs = svgRoot.append("defs");
+    defs.append("clipPath").attr("id", "water-chart-clip")
+      .append("rect").attr("width", width).attr("height", height);
+    defs.append("clipPath").attr("id", "water-x-axis-clip")
+        .append("rect").attr("x", 0).attr("y", 0).attr("width", width).attr("height", margin.bottom);
+
+    // --- 2. LAYOUT GROUPS ---
+    const chartArea = g.append("g").attr("clip-path", "url(#water-chart-clip)");
     const yAxisG = g.append("g");
-    const legendG = g.append("g").attr("transform", `translate(${width + 20},10)`);
+    const xAxisG = g.append("g")
+      .attr("transform", `translate(0,${height})`)
+      .attr("clip-path", "url(#water-x-axis-clip)");
+    
+    // Centered Labels
+    const chartCenterX = (totalWidth / 2) - margin.left;
 
-    const tooltip = container.append("div")
-      .attr("class", "tooltip")
-      .style("position", "absolute")
-      .style("opacity", 0)
-      .style("pointer-events", "none");
+    // X-Axis Label
+    g.append("text")
+      .attr("x", chartCenterX)
+      .attr("y", height + 40)
+      .attr("text-anchor", "middle")
+      .style("font-size", "12px")
+      .text("Year");
+
+    // Y-Axis Label placeholder (updated in draw)
+    const yLabel = g.append("text")
+      .attr("transform", "rotate(-90)")
+      .attr("x", -height / 2)
+      .attr("y", -45)
+      .attr("text-anchor", "middle")
+      .style("font-size", "12px");
+
+    // Centered Legend (Robust Positioning without getBBox)
+    const colors = { start: "#555555", increase: "#0072B2", decrease: "#D55E00" };
+    const legendData = [
+      { l: "Start", c: colors.start, x: -100 },
+      { l: "Increase", c: colors.increase, x: 0 },
+      { l: "Decrease", c: colors.decrease, x: 100 }
+    ];
+    
+    const legend = g.append("g")
+      .attr("class", "legend-group")
+      .attr("transform", `translate(${chartCenterX}, ${height + 60})`);
+
+    const legendItems = legend.selectAll("g")
+      .data(legendData)
+      .join("g")
+      .attr("transform", d => `translate(${d.x}, 0)`);
+
+    legendItems.append("rect")
+      .attr("x", -50) // Shift item components left so group is centered around anchor
+      .attr("width", 12)
+      .attr("height", 12)
+      .attr("fill", d => d.c);
+
+    legendItems.append("text")
+      .attr("x", -32)
+      .attr("y", 10)
+      .style("font-size", "12px")
+      .text(d => d.l);
 
     d3.text("data/merged.csv").then(raw => {
-
-      const dsv = d3.dsvFormat(";");
-      const rows = dsv.parse(raw);
-
-      const keys = Object.keys(rows[0] || {});
-      const countryKey = keys.find(k => /country/i.test(k)) || keys[1];
-      const yearKey = keys.find(k => /year/i.test(k)) || "Year";
-      const gdpKey = keys.find(k => /GDP/i.test(k)) || "GDP";
-
+      const rows = d3.dsvFormat(";").parse(raw);
+      const indicatorKey = state.indicator;
       const cleaned = rows.map(r => ({
-        country: r[countryKey]?.trim(),
-        year: +r[yearKey],
-        gdp: parseNum(r[gdpKey])
+        country: r["Country Name"]?.trim(),
+        year: +r["Year"],
+        val: parseNum(r[indicatorKey])
       })).filter(d => d.country && !isNaN(d.year));
 
       const byCountry = d3.group(cleaned, d => d.country);
-      const countries = Array.from(byCountry.keys()).sort(d3.ascending);
-
-      select.selectAll("option")
-        .data(countries)
-        .join("option")
-        .attr("value", d => d)
-        .text(d => d);
-
-      const xBand = d3.scaleBand().paddingInner(0.15).range([0, width]);
+      const countries = Array.from(byCountry.keys()).sort();
+      const xBand = d3.scaleBand().paddingInner(0.2).range([0, width]);
       const y = d3.scaleLinear().range([height, 0]);
-
-      const fmt = d3.format(",.0f");
-      const fmtShort = d3.format(".2s");
 
       function computeWaterfall(dataSorted) {
         const items = [];
-        let cum = dataSorted[0].gdp || 0;
-
-        items.push({
-          type: "start",
-          year: dataSorted[0].year,
-          value: dataSorted[0].gdp,
-          start: 0,
-          end: cum
-        });
-
+        if (dataSorted.length === 0) return items;
+        let cum = dataSorted[0].val || 0;
+        items.push({ type: "start", year: dataSorted[0].year, value: dataSorted[0].val, start: 0, end: cum });
         for (let i = 1; i < dataSorted.length; i++) {
-          const prev = dataSorted[i - 1].gdp || 0;
-          const cur = dataSorted[i].gdp || 0;
-          items.push({
-            type: cur - prev >= 0 ? "increase" : "decrease",
-            year: dataSorted[i].year,
-            value: cur - prev,
-            start: prev,
-            end: cur
-          });
+          const prev = dataSorted[i - 1].val || 0;
+          const cur = dataSorted[i].val || 0;
+          items.push({ type: cur - prev >= 0 ? "increase" : "decrease", year: dataSorted[i].year, value: cur - prev, start: prev, end: cur });
         }
         return items;
       }
 
       function draw(country) {
+        // Update Titles/Labels
+        title.text(`Evolution of ${displayName} in ${country}`);
+        yLabel.text(displayName);
 
-        chartG.selectAll("*").remove();
-        legendG.selectAll("*").remove();
-
+        chartArea.selectAll("*").remove();
         const rows = (byCountry.get(country) || []).sort((a, b) => a.year - b.year);
         if (!rows.length) return;
 
         const items = computeWaterfall(rows);
-        const years = items.map(d => d.year);
+        xBand.domain(items.map(d => d.year));
+        const minVal = d3.min(items, d => Math.min(d.start, d.end, 0));
+        const maxVal = d3.max(items, d => Math.max(d.start, d.end, 0));
+        y.domain([minVal * 1.1, maxVal * 1.1]).nice();
 
-        xBand.domain(years);
+        // --- 3. ZOOM LOGIC ---
+        const zoom = d3.zoom()
+          .scaleExtent([1, 20])
+          .extent([[0, 0], [width, height]])
+          .translateExtent([[0, 0], [width, height]])
+          .on("zoom", (event) => {
+            const t = event.transform;
+            const zy = t.rescaleY(y);
+            const zx = xBand.copy().range([0, width].map(d => t.applyX(d)));
 
-        const values = items.flatMap(d => [d.start, d.end]);
-        y.domain([
-          d3.min(values.concat(0)) * 1.05,
-          d3.max(values.concat(0)) * 1.05
-        ]).nice();
+            yAxisG.call(d3.axisLeft(zy).tickFormat(d3.format(".2s")));
+            xAxisG.call(d3.axisBottom(zx).tickValues(zx.domain().filter((_, i) => i % 2 === 0)));
 
-        const xTicksEvery = Math.ceil(years.length / 12);
-        const xTickValues = years.filter((_, i) => i % xTicksEvery === 0);
+            chartArea.selectAll(".bar")
+              .attr("x", d => zx(d.year))
+              .attr("y", d => zy(Math.max(d.start, d.end)))
+              .attr("width", zx.bandwidth())
+              .attr("height", d => Math.abs(zy(d.start) - zy(d.end)));
 
-        xAxisG.call(
-          d3.axisBottom(xBand)
-            .tickValues(xTickValues)
-            .tickFormat(d3.format("d"))
-        ).selectAll("text")
-          .attr("transform", "rotate(-40)")
-          .style("text-anchor", "end");
-
-        yAxisG.call(d3.axisLeft(y).tickFormat(fmtShort));
-
-        chartG.append("text")
-          .attr("class", "chart-title")
-          .attr("x", 0)
-          .attr("y", -18)
-          .text(`${country} — GDP Waterfall`);
-
-        const bw = Math.max(6, xBand.bandwidth());
-
-        const bar = chartG.selectAll(".bar")
-          .data(items)
-          .join("g")
-          .attr("class", "bar")
-          .attr("transform", d => `translate(${xBand(d.year)},0)`);
-
-        bar.append("rect")
-          .attr("x", 0)
-          .attr("width", bw)
-          .attr("y", d => y(Math.max(d.start, d.end)))
-          .attr("height", d => Math.max(1, Math.abs(y(d.start) - y(d.end))))
-          .attr("fill", d => d.type === "start" ? "#4682b4" : d.type === "increase" ? "#2e8b57" : "#b22222")
-          .attr("stroke", "#333")
-          .on("mouseenter", (event, d) => {
-            tooltip
-              .style("opacity", 1)
-              .html(
-                d.type === "start"
-                  ? `<strong>${d.year}</strong><br>Start: ${fmt(d.value)}`
-                  : `<strong>${d.year}</strong><br>Δ: ${(d.value >= 0 ? "+" : "") + fmt(d.value)}<br>Prev: ${fmt(d.start)}<br>Now: ${fmt(d.end)}`
-              )
-              .style("left", (event.pageX + 14) + "px")
-              .style("top", (event.pageY - 10) + "px");
-          })
-          .on("mouseleave", () => {
-            tooltip.style("opacity", 0);
+            chartArea.select(".zero-line").attr("y1", zy(0)).attr("y2", zy(0));
           });
 
-        bar.append("text")
-          .attr("x", bw / 2)
-          .attr("y", d => y(Math.max(d.start, d.end)) - 6)
-          .attr("text-anchor", "middle")
-          .style("font-size", "12px")
-          .text(d => d.type === "start" ? fmt(d.value) : (d.value >= 0 ? "+" : "") + fmt(d.value));
+        svgRoot.call(zoom);
 
-        const legendData = [
-          { label: "Start", color: "#4682b4" },
-          { label: "Increase", color: "#2e8b57" },
-          { label: "Decrease", color: "#b22222" }
-        ];
+        // Initial Axis Render
+        xAxisG.call(d3.axisBottom(xBand).tickValues(xBand.domain().filter((_, i) => i % 2 === 0)));
+        yAxisG.call(d3.axisLeft(y).tickFormat(d3.format(".2s")));
 
-        const legend = legendG.selectAll(".legendItem")
-          .data(legendData)
-          .join("g")
-          .attr("class", "legendItem")
-          .attr("transform", (d, i) => `translate(0,${i * 22})`);
+        if (minVal < 0 && maxVal > 0) {
+            chartArea.append("line").attr("class", "zero-line")
+                .attr("x1", 0).attr("x2", width).attr("y1", y(0)).attr("y2", y(0))
+                .attr("stroke", "black").attr("stroke-width", 1).attr("stroke-dasharray", "4,4").style("opacity", 0.5);
+        }
 
-        legend.append("rect")
-          .attr("width", 14)
-          .attr("height", 14)
-          .attr("fill", d => d.color)
-          .attr("stroke", "#333");
-
-        legend.append("text")
-          .attr("x", 20)
-          .attr("y", 12)
-          .text(d => d.label);
+        chartArea.selectAll(".bar").data(items).join("rect")
+          .attr("class", "bar")
+          .attr("x", d => xBand(d.year))
+          .attr("y", d => y(Math.max(d.start, d.end)))
+          .attr("width", xBand.bandwidth())
+          .attr("height", d => Math.abs(y(d.start) - y(d.end)))
+          .attr("fill", d => colors[d.type])
+          .on("mouseover", function(event, d) {
+            tooltip.style("opacity", 1)
+                   .html(`<strong>${d.year}</strong><br>Change: ${d3.format(".2s")(d.value)}<br>Total: ${d3.format(".2s")(d.end)}`);
+          })
+          .on("mousemove", function(event) {
+            tooltip.style("left", (event.pageX + 10) + "px")
+                   .style("top", (event.pageY - 10) + "px");
+          })
+          .on("mouseout", function() {
+            tooltip.style("opacity", 0);
+          });
       }
-
-      draw(countries[0]);
-
-      select.on("change", e => draw(e.target.value));
-      resetBtn.on("click", () => draw(select.node().value));
-
-    }).catch(err => {
-      console.error(err);
-      card.append("div").text("Error loading data.");
+      
+      draw(state.country || countries[0]);
     });
   }
-
   window.renderWaterChart = renderWaterChart;
-
 })();
-

@@ -2,41 +2,13 @@
   --bg: #f8f8f8;
   --card: #ffffff;
   --muted: #666666;
-  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
-}
-
-#water_chart * {
-  box-sizing: border-box;
+  font-family: sans-serif; /* Matches Bubble Chart style */
 }
 
 #water_chart .waterfall-layout {
   display: grid;
   grid-template-columns: 220px 1fr;
   gap: 16px;
-}
-
-#water_chart .waterfall-controls {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-#water_chart .waterfall-controls label {
-  font-weight: 600;
-}
-
-#water_chart .waterfall-controls select {
-  width: 100%;
-  font-size: 14px;
-}
-
-#water_chart .waterfall-controls button {
-  padding: 8px 12px;
-  border-radius: 6px;
-  border: 1px solid #999;
-  background: #f3f3f3;
-  cursor: pointer;
-  font-size: 14px;
 }
 
 #water_chart .waterfall-card {
@@ -52,22 +24,11 @@
   display: block;
 }
 
-#water_chart .chart-title {
-  font-size: 16px;
-  font-weight: 600;
+#water_chart .tick text {
+  font-size: 10px;
+  fill: black;
 }
 
-#water_chart .tooltip {
-  background: white;
-  border: 1px solid #ddd;
-  padding: 8px;
-  border-radius: 6px;
-  font-size: 13px;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
-}
-
-#water_chart .note {
-  font-size: 14px;
-  color: var(--muted);
-  margin-top: 12px;
+#water_chart .domain {
+  stroke: black;
 }

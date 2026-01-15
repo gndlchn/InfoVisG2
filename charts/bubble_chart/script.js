@@ -1,6 +1,5 @@
 (function () {
-
-  const margin = { top: 30, right: 30, bottom: 50, left: 60 };
+  const margin = { top: 80, right: 30, bottom: 60, left: 60 };
   const width = 800 - margin.left - margin.right;
   const height = 400 - margin.top - margin.bottom;
 
@@ -10,19 +9,13 @@
     return parseFloat(String(v).replace(",", "."));
   };
 
-  function renderBubbleChart(containerId) {
-
+  function renderBubbleChart(containerId, state) {
     const root = d3.select(containerId);
+    const tooltip = d3.select("#chart-tooltip");
     root.selectAll("*").remove();
 
     const container = root.append("div")
       .attr("class", "bubble-container");
-
-    const controls = container.append("div")
-      .attr("class", "bubble-controls");
-
-    const yearSelect = controls.append("select");
-    const regionSelect = controls.append("select");
 
     const svgRoot = container.append("svg")
       .attr(
@@ -30,6 +23,15 @@
         `0 0 ${width + margin.left + margin.right} ${height + margin.top + margin.bottom}`
       )
       .attr("preserveAspectRatio", "xMidYMid meet");
+
+    svgRoot.append("text")
+      .attr("x", (width + margin.left + margin.right) / 2)
+      .attr("y", 40)
+      .attr("text-anchor", "middle")
+      .style("font-size", "20px")
+      .style("font-weight", "bold")
+      .style("font-family", "sans-serif")
+      .text(`Trade openness of ${state.continent} in ${state.year}`);
 
     const svg = svgRoot.append("g")
       .attr("transform", `translate(${margin.left},${margin.top})`);
@@ -44,11 +46,7 @@
     const chartArea = svg.append("g")
       .attr("clip-path", "url(#bubble-clip)");
 
-    const legendContainer = container.append("div")
-      .attr("class", "bubble-legend");
-
     d3.text("data/merged.csv").then(raw => {
-
       const data = d3.dsvFormat(";").parse(raw, d => ({
         country: d["Country Name"],
         region: d.continent,
@@ -63,18 +61,7 @@
         d.region
       );
 
-      const regions = [
-        "Europe",
-        "Asia",
-        "Africa",
-        "Oceania",
-        "North America",
-        "South America"
-      ];
-
-      const colorScale = d3.scaleOrdinal()
-        .domain(regions)
-        .range(d3.schemeCategory10);
+      const bubbleColor = "#0072B2";
 
       const xScale = d3.scaleLinear()
         .domain(d3.extent(data, d => d.fdi))
@@ -99,8 +86,9 @@
 
       svg.append("text")
         .attr("x", width / 2)
-        .attr("y", height + 40)
+        .attr("y", height + 45)
         .attr("text-anchor", "middle")
+        .style("font-size", "12px")
         .text("FDI Net Inflows (% of GDP)");
 
       svg.append("text")
@@ -108,24 +96,13 @@
         .attr("x", -height / 2)
         .attr("y", -45)
         .attr("text-anchor", "middle")
+        .style("font-size", "12px")
         .text("Trade (% of GDP)");
 
-      const years = [...new Set(data.map(d => d.year))].sort((a, b) => b - a);
-
-      yearSelect.selectAll("option")
-        .data(years)
-        .join("option")
-        .attr("value", d => d)
-        .text(d => d);
-
-      regionSelect.selectAll("option")
-        .data(["All Regions", ...regions])
-        .join("option")
-        .attr("value", d => d)
-        .text(d => d);
-
       const zoom = d3.zoom()
-        .scaleExtent([0.5, 20])
+        .scaleExtent([1, 20])
+        .extent([[0, 0], [width, height]])
+        .translateExtent([[0, 0], [width, height]])
         .on("zoom", event => {
           const zx = event.transform.rescaleX(xScale);
           const zy = event.transform.rescaleY(yScale);
@@ -163,47 +140,39 @@
               .attr("cx", d => zx(d.fdi))
               .attr("cy", d => zy(d.trade))
               .attr("r", d => rScale(d.gdp))
-              .attr("fill", d => colorScale(d.region))
-              .append("title")
-              .text(d =>
-                `${d.country}
-FDI: ${d.fdi}%
-Trade: ${d.trade}%
-GDP PPP: ${formatGDP(d.gdp)}`
-              ),
+              .attr("fill", bubbleColor)
+              .attr("opacity", 0.5)
+              .style("cursor", "pointer") // Visual cue for interactivity
+              .on("mouseover", function(event, d) {
+                tooltip.style("opacity", 1)
+                       .html(`<strong>${d.country}</strong><br>FDI: ${d.fdi.toFixed(2)}%<br>Trade: ${d.trade.toFixed(2)}%<br>GDP PPP: ${formatGDP(d.gdp)}`);
+              })
+              .on("mousemove", function(event) {
+                tooltip.style("left", (event.pageX + 10) + "px")
+                       .style("top", (event.pageY - 10) + "px");
+              })
+              .on("mouseout", function() {
+                tooltip.style("opacity", 0);
+              })
+              .on("click", function(event, d) {
+                // Update filters using the dashboard's helper function
+                if (typeof window.updateFilters === "function") {
+                  window.updateFilters(d.country, d.region);
+                }
+              }),
 
             update => update
+              .transition().duration(500)
               .attr("cx", d => zx(d.fdi))
               .attr("cy", d => zy(d.trade))
               .attr("r", d => rScale(d.gdp))
-              .attr("fill", d => colorScale(d.region))
-              .select("title")
-              .text(d =>
-                `${d.country}
-FDI: ${d.fdi}%
-Trade: ${d.trade}%
-GDP PPP: ${formatGDP(d.gdp)}`
-              ),
+              .attr("fill", bubbleColor),
 
             exit => exit.remove()
           );
       }
 
       update();
-      yearSelect.on("change", update);
-      regionSelect.on("change", update);
-
-      const legend = legendContainer.selectAll(".legend-item")
-        .data(regions)
-        .join("div")
-        .attr("class", "legend-item");
-
-      legend.append("span")
-        .text(d => d);
-
-      legend.append("span")
-        .attr("class", "legend-dot")
-        .style("background-color", d => colorScale(d));
 
     }).catch(err => {
       console.error(err);
@@ -212,5 +181,4 @@ GDP PPP: ${formatGDP(d.gdp)}`
   }
 
   window.renderBubbleChart = renderBubbleChart;
-
 })();
