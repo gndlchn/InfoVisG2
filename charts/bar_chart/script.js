@@ -57,7 +57,7 @@ window.renderBarChart = function(containerId, state) {
 
     const yScale = d3.scaleBand().domain(data.map(d => d.country)).range([0, height]).padding(0.15);
     const maxVal = d3.max(data, d => Math.max(d.exportsval, d.importsval));
-    const xScale = d3.scaleLinear().domain([-maxVal, maxVal]).range([0, width]);
+    const xScale = d3.scaleLinear().domain([-maxVal, maxVal]).range([0, width]).padding(0.15);
 
     // --- 3. ZOOM LOGIC ---
     const zoom = d3.zoom()
