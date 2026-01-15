@@ -1,15 +1,15 @@
 window.renderBarChart = function(containerId, state) {
-  const margin = { top: 80, right: 30, bottom: 80, left: 180 };
+  const margin = { top: 80, right: 30, bottom: 80, left: 140 };
   const totalWidth = 800;
-  // const totalHeight = 400;
+  const totalHeight = 400;
   // new
-  const baseRowHeight = 25; 
-  const dynamicHeight = Math.max(400, data.length * baseRowHeight); 
-  const totalHeight = dynamicHeight; 
-  const height = totalHeight - margin.top - margin.bottom;
+  // const baseRowHeight = 25; 
+  // const dynamicHeight = Math.max(400, data.length * baseRowHeight); 
+  // const totalHeight = dynamicHeight; 
+  // const height = totalHeight - margin.top - margin.bottom;
   
   const width = totalWidth - margin.left - margin.right;
- // const height = totalHeight - margin.top - margin.bottom;
+  const height = totalHeight - margin.top - margin.bottom;
 
   const container = d3.select(containerId);
   const tooltip = d3.select("#chart-tooltip");
