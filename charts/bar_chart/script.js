@@ -4,7 +4,7 @@ window.renderBarChart = function(containerId, state) {
   // const totalHeight = 400;
   // new
   const baseRowHeight = 25; 
-  const dynamicHeight = Math.max(400, data.length * baseRowHeight); 
+  const dynamicHeight = Math.max(800, data.length * baseRowHeight); 
   const totalHeight = dynamicHeight; 
   const height = totalHeight - margin.top - margin.bottom;
   
