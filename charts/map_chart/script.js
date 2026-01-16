@@ -42,13 +42,13 @@ function drawMap(countries, containerId, state) {
   mapSvg.append("text")
     .attr("id", "map-chart-title")
     .attr("x", width / 2)
-    .attr("y", 35)
+    .attr("y", 50)
     .attr("text-anchor", "middle")
     .style("font-size", "22px")
     .style("font-weight", "bold")
     .style("font-family", "sans-serif");
 
-  const projection = d3.geoNaturalEarth1().scale(160).translate([width / 2, height / 2 - 20]);
+  const projection = d3.geoNaturalEarth1().scale(135).translate([width / 2, height / 2 - 20]);
   mapPath = d3.geoPath().projection(projection);
   const g = mapSvg.append("g").attr("class", "countries");
 
