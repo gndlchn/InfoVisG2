@@ -37,20 +37,27 @@ function drawMap(countries, containerId, state) {
     .attr("preserveAspectRatio", "xMidYMid meet")
     .style("width", "100%")
     .style("height", "100%");
+  
+  const mapTop = 80;
+  const mapBottom = 540;
 
-  // Centered dynamic title
-  mapSvg.append("text")
-    .attr("id", "map-chart-title")
-    .attr("x", width / 2)
-    .attr("y", 50)
-    .attr("text-anchor", "middle")
-    .style("font-size", "22px")
-    .style("font-weight", "bold")
-    .style("font-family", "sans-serif");
+  mapSvg.append("defs")
+    .append("clipPath")
+    .attr("id", "map-clip")
+    .append("rect")
+    .attr("x", 0)
+    .attr("y", mapTop)
+    .attr("width", width)
+    .attr("height", mapBottom - mapTop);
 
-  const projection = d3.geoNaturalEarth1().scale(135).translate([width / 2, height / 2 - 20]);
+  const projection = d3.geoNaturalEarth1().scale(145).translate([width / 2, height / 2 - 20]);
   mapPath = d3.geoPath().projection(projection);
-  const g = mapSvg.append("g").attr("class", "countries");
+
+  const zoomGroup = mapSvg.append("g")
+    .attr("class", "zoom-group")
+    .attr("clip-path", "url(#map-clip)");
+
+  const g = zoomGroup.append("g").attr("class", "countries");
 
   g.selectAll("path").data(countries).join("path")
     .attr("d", mapPath).attr("stroke", "#333").attr("fill", "#ccc")
@@ -89,14 +96,30 @@ function drawMap(countries, containerId, state) {
       }
     });
 
-  mapSvg.append("g").attr("id", "map-legend-group");
+  mapSvg.append("g").attr("id", "map-legend-group").style("pointer-events", "none");;
+  
+  const zoom = d3.zoom()
+    .scaleExtent([1, 8]) //zoom levels
+    .translateExtent([
+      [0, 60],              
+      [width, height - 40]
+    ])
+    .on("zoom", (event) => {
+      zoomGroup.attr("transform", event.transform);
+    });
+  
+  mapSvg.call(zoom);
+
+  mapSvg.style("cursor", "grab");
+  mapSvg.on("mousedown", () => mapSvg.style("cursor", "grabbing"));
+  mapSvg.on("mouseup mouseleave", () => mapSvg.style("cursor", "grab"));
+
 }
 
 function updateMap(state, displayName) {
   if (!mapSvg) return;
 
-  // Update dynamic title text
-  mapSvg.select("#map-chart-title")
+  d3.select("#map-title")
     .text(`${displayName} by country in ${state.year}`);
 
   // Rebuild color scale and legend if the indicator changes
@@ -127,6 +150,7 @@ function updateMap(state, displayName) {
 
 function updateLegend(title) {
   const g = d3.select("#map-legend-group");
+  g.style("pointer-events", "none");
   g.selectAll("*").remove();
   
   const width = 900, legendWidth = 240, legendHeight = 12;
