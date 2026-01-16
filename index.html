@@ -105,10 +105,13 @@
 
         <div class="card">
           <div class="card-body small">
-            <strong>How to read the map</strong>
-            <p class="mb-1">Darker colors indicate higher GDP.</p>
-            <p class="mb-1">Gray indicates missing data for the selected year.</p>
-            <p class="mb-0">Hover for values, click for details.</p>
+            <strong class="d-block mb-2">How to read the map</strong>
+            <ul class="list-unstyled mb-0">
+              <li class="mb-1">• Color intensity shows the selected indicator</li>
+              <li class="mb-1">• Darker colors mean higher values</li>
+              <li class="mb-1">• Gray means missing data</li>
+              <li>• Hover for values, click for details</li>
+            </ul>
           </div>
         </div>
 
@@ -188,7 +191,15 @@
                 </div>
               </div>
               <div class="col-sm-3">
-                This chart shows annual absolute changes of GDP for a country. This way, the growth path becomes visible and each country's trajectory over time can be seen in detail.
+                <p>
+                  This waterfall chart provides a granular, year-over-year breakdown of how the selected indicator has evolved for a specific country. Unlike a standard line chart, this visualization emphasizes the <strong>absolute change</strong> between consecutive years, making it easy to identify specific periods of rapid acceleration or significant contraction.
+                </p>
+                <p>
+                  <strong>Blue bars</strong> represent annual increases, while <strong>orange bars</strong> indicate a decrease compared to the previous year. The chart "steps" through time, showing how each year's performance contributes to the final total. 
+                </p>
+                <p class="small text-muted">
+                  <strong>Interaction:</strong> Hover over any bar to see the specific change and cumulative total for that year. Use your mouse wheel to zoom into specific historical periods for a closer look at volatility.
+                </p>
               </div>
             </div>
           </div>
@@ -208,9 +219,15 @@
                 </div>
               </div>
               <div class="col-sm-3">
-                 By plotting Foreign Direct Investment (attractiveness to capital) against Trade (reliance on exchange), this chart reveals distinct economic archetypes. 
-                 <br><br>
-                 Including GDP Purchasing Power Parity as bubble size adds a layer of reality, showing actual economic weight versus relative percentages.
+                 <p>
+                  This chart explores the relationship between a country's internal capital attractiveness and its integration into the global marketplace. By plotting <strong>Foreign Direct Investment (FDI)</strong> against <strong>Trade Openness</strong> (both as % of GDP), you can identify distinct economic archetypes, from "Trade Hubs" with high exchange volumes to "Capital Magnets" attracting significant outside investment.
+                </p>
+                <p>
+                  The <strong>size of each bubble</strong> represents the country's GDP at Purchasing Power Parity (PPP). This adds a layer of "economic weight," allowing you to see if high trade percentages belong to small, specialized nations or large, diversified global powers.
+                </p>
+                <p class="small text-muted">
+                  <strong>Interaction:</strong> Bubbles are clickable, selecting one will update the rest of the dashboard to focus on that country. Zooming allows you to navigate crowded areas of the plot where many countries have similar profiles.
+                </p>
               </div>
             </div>
           </div>
@@ -230,9 +247,15 @@
                 </div>
               </div>
               <div class="col-sm-3">
-                This chart allows to compare whether a country relies heavily on import or export or has a trading balance. 
-                <br><br>
-                By giving the context of countries on the same continent comparison of economic strength is possible. 
+                <p>
+                  This divergent bar chart offers a side-by-side comparison of a nation's <strong>Trade Balance</strong>. By mirroring exports and imports across a central axis, it becomes immediately clear whether a country maintains a trade surplus or a trade deficit within its continental context.
+                </p>
+                <p>
+                  <strong>Blue bars (Exports)</strong> extending to the right represent goods and services sent abroad, while <strong>orange bars (Imports)</strong> extending to the left represent those brought in. This visualization is essential for understanding regional economic strength and identifying which nations act as the primary "producers" or "consumers" within their continent.
+                </p>
+                <p class="small text-muted">
+                  <strong>Interaction:</strong> All values are scaled to Billions of USD. Hover over any bar for precise figures, or click a country's bar to filter the entire dashboard to that nation's data.
+                </p>
               </div>
             </div>
           </div>

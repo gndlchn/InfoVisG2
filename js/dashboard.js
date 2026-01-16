@@ -5,7 +5,6 @@ const state = {
   indicator: "GDP" 
 };
 
-// Indicators in the specific order with descriptions
 const indicatorConfig = [
   { 
     name: "GDP", key: "GDP", 
@@ -55,7 +54,6 @@ window.updateFilters = function(country, continent) {
   if (continentSelect) continentSelect.value = continent;
   if (countrySelect) countrySelect.value = country;
   
-  // Refresh all charts
   renderAll();
 };
 
@@ -89,7 +87,6 @@ function initFilters() {
 
   indicatorSelect.addEventListener("change", e => {
     state.indicator = e.target.value;
-    // Update Description Text
     const cfg = indicatorConfig.find(c => c.key === state.indicator);
     descriptionDiv.textContent = cfg ? cfg.description : "";
     renderAll();

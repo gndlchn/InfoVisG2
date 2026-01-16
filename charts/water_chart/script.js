@@ -21,7 +21,6 @@
       .attr("viewBox", `0 0 ${totalWidth} ${totalHeight}`)
       .attr("preserveAspectRatio", "xMidYMid meet");
 
-    // Centered dynamic title
     const title = svgRoot.append("text")
       .attr("x", totalWidth / 2)
       .attr("y", 40)
@@ -32,24 +31,20 @@
 
     const g = svgRoot.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
 
-    // --- 1. DEFINITIONS (Clips) ---
     const defs = svgRoot.append("defs");
     defs.append("clipPath").attr("id", "water-chart-clip")
       .append("rect").attr("width", width).attr("height", height);
     defs.append("clipPath").attr("id", "water-x-axis-clip")
         .append("rect").attr("x", 0).attr("y", 0).attr("width", width).attr("height", margin.bottom);
 
-    // --- 2. LAYOUT GROUPS ---
     const chartArea = g.append("g").attr("clip-path", "url(#water-chart-clip)");
     const yAxisG = g.append("g");
     const xAxisG = g.append("g")
       .attr("transform", `translate(0,${height})`)
       .attr("clip-path", "url(#water-x-axis-clip)");
     
-    // Centered Labels
     const chartCenterX = (totalWidth / 2) - margin.left;
 
-    // X-Axis Label
     g.append("text")
       .attr("x", chartCenterX)
       .attr("y", height + 40)
@@ -57,7 +52,6 @@
       .style("font-size", "12px")
       .text("Year");
 
-    // Y-Axis Label placeholder (updated in draw)
     const yLabel = g.append("text")
       .attr("transform", "rotate(-90)")
       .attr("x", -height / 2)
@@ -65,7 +59,6 @@
       .attr("text-anchor", "middle")
       .style("font-size", "12px");
 
-    // Centered Legend (Robust Positioning without getBBox)
     const colors = { start: "#555555", increase: "#0072B2", decrease: "#D55E00" };
     const legendData = [
       { l: "Start", c: colors.start, x: -100 },
@@ -83,7 +76,7 @@
       .attr("transform", d => `translate(${d.x}, 0)`);
 
     legendItems.append("rect")
-      .attr("x", -50) // Shift item components left so group is centered around anchor
+      .attr("x", -50) 
       .attr("width", 12)
       .attr("height", 12)
       .attr("fill", d => d.c);
@@ -122,7 +115,6 @@
       }
 
       function draw(country) {
-        // Update Titles/Labels
         title.text(`Evolution of ${displayName} in ${country}`);
         yLabel.text(displayName);
 
@@ -136,7 +128,6 @@
         const maxVal = d3.max(items, d => Math.max(d.start, d.end, 0));
         y.domain([minVal * 1.1, maxVal * 1.1]).nice();
 
-        // --- 3. ZOOM LOGIC ---
         const zoom = d3.zoom()
           .scaleExtent([1, 20])
           .extent([[0, 0], [width, height]])
@@ -160,7 +151,6 @@
 
         svgRoot.call(zoom);
 
-        // Initial Axis Render
         xAxisG.call(d3.axisBottom(xBand).tickValues(xBand.domain().filter((_, i) => i % 2 === 0)));
         yAxisG.call(d3.axisLeft(y).tickFormat(d3.format(".2s")));
 

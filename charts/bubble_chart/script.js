@@ -142,7 +142,7 @@
               .attr("r", d => rScale(d.gdp))
               .attr("fill", bubbleColor)
               .attr("opacity", 0.5)
-              .style("cursor", "pointer") // Visual cue for interactivity
+              .style("cursor", "pointer") 
               .on("mouseover", function(event, d) {
                 tooltip.style("opacity", 1)
                        .html(`<strong>${d.country}</strong><br>FDI: ${d.fdi.toFixed(2)}%<br>Trade: ${d.trade.toFixed(2)}%<br>GDP PPP: ${formatGDP(d.gdp)}`);
@@ -155,7 +155,6 @@
                 tooltip.style("opacity", 0);
               })
               .on("click", function(event, d) {
-                // Update filters using the dashboard's helper function
                 if (typeof window.updateFilters === "function") {
                   window.updateFilters(d.country, d.region);
                 }

@@ -2,12 +2,6 @@ let dataByCountryYear;
 let mapSvg, mapColor, mapPath, worldData;
 let currentIndicator = ""; 
 
-/**
- * Main function called by dashboard.js to render or update the Map
- * @param {string} containerId - The CSS selector for the container
- * @param {object} state - Global state { year, indicator, ... }
- * @param {string} displayName - Human-readable name of the indicator
- */
 window.renderMapChart = function(containerId, state, displayName) {
   if (!dataByCountryYear) {
     Promise.all([ 
@@ -15,7 +9,6 @@ window.renderMapChart = function(containerId, state, displayName) {
       d3.json("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json") 
     ]).then(([raw, world]) => {
         const rawData = d3.dsvFormat(";").parse(raw);
-        // Group raw data to support dynamic column switching
         dataByCountryYear = d3.group(rawData, d => d["Country Name"], d => +d.Year); 
         worldData = topojson.feature(world, world.objects.countries).features;
         
@@ -61,7 +54,7 @@ function drawMap(countries, containerId, state) {
 
   g.selectAll("path").data(countries).join("path")
     .attr("d", mapPath).attr("stroke", "#333").attr("fill", "#ccc")
-    .style("cursor", "pointer") // Visual cue that countries are clickable
+    .style("cursor", "pointer") 
     .on("mouseover", function(event, d) { 
       d3.select(this).attr("stroke-width", 2); 
       const name = nameMap[d.properties.name.trim()] || d.properties.name.trim();
@@ -85,11 +78,9 @@ function drawMap(countries, containerId, state) {
       const countryDataMap = dataByCountryYear.get(name);
       
       if (countryDataMap) {
-        // Find the continent for this country from the data
         const firstYearEntry = countryDataMap.values().next().value[0];
         const continent = firstYearEntry.continent;
         
-        // Update global filters and refresh all charts
         if (typeof window.updateFilters === "function") {
           window.updateFilters(name, continent);
         }
@@ -99,7 +90,7 @@ function drawMap(countries, containerId, state) {
   mapSvg.append("g").attr("id", "map-legend-group").style("pointer-events", "none");;
   
   const zoom = d3.zoom()
-    .scaleExtent([1, 8]) //zoom levels
+    .scaleExtent([1, 8]) 
     .translateExtent([
       [0, 60],              
       [width, height - 40]
@@ -122,7 +113,6 @@ function updateMap(state, displayName) {
   d3.select("#map-title")
     .text(`${displayName} by country in ${state.year}`);
 
-  // Rebuild color scale and legend if the indicator changes
   if (currentIndicator !== state.indicator) {
     currentIndicator = state.indicator;
     
@@ -143,7 +133,6 @@ function updateMap(state, displayName) {
       const name = nameMap[d.properties.name.trim()] || d.properties.name.trim();
       const entry = dataByCountryYear.get(name)?.get(state.year);
       const val = entry ? +entry[0][currentIndicator] : NaN;
-      // Handle missing or zero data with a neutral gray
       return (isNaN(val) || val === 0) ? "#ddd" : mapColor(val);
     });
 }
@@ -155,11 +144,10 @@ function updateLegend(title) {
   
   const width = 900, legendWidth = 240, legendHeight = 12;
   const xOffset = (width - legendWidth) / 2;
-  const yOffset = 550; // Shifted slightly further down to avoid map overlap
+  const yOffset = 550; 
 
   const legend = g.append("g").attr("transform", `translate(${xOffset}, ${yOffset})`);
 
-  // Legend labels
   legend.append("text").attr("x", legendWidth / 2).attr("y", -15)
     .attr("text-anchor", "middle").style("font-size", "12px").style("font-family", "sans-serif")
     .style("fill", "black").text(title);

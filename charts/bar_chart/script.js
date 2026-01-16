@@ -13,7 +13,6 @@ window.renderBarChart = function(containerId, state) {
     .attr("viewBox", `0 0 ${totalWidth} ${totalHeight}`)
     .attr("preserveAspectRatio", "xMidYMid meet");
 
-  // Add centered dynamic title
   svgRoot.append("text")
     .attr("x", totalWidth / 2)
     .attr("y", 40)
@@ -26,7 +25,6 @@ window.renderBarChart = function(containerId, state) {
   const g = svgRoot.append("g")
     .attr("transform", `translate(${margin.left},${margin.top})`);
 
-  // --- 1. DEFINITIONS (Clips) ---
   const defs = svgRoot.append("defs");
   defs.append("clipPath").attr("id", "bar-chart-clip")
     .append("rect").attr("width", width).attr("height", height);
@@ -35,7 +33,6 @@ window.renderBarChart = function(containerId, state) {
   defs.append("clipPath").attr("id", "bar-x-axis-clip")
     .append("rect").attr("x", 0).attr("y", 0).attr("width", width).attr("height", margin.bottom);
 
-  // --- 2. LAYOUT GROUPS ---
   const chartArea = g.append("g").attr("clip-path", "url(#bar-chart-clip)");
   const yAxisG = g.append("g").attr("clip-path", "url(#bar-y-axis-clip)");
   const xAxisG = g.append("g")
@@ -59,7 +56,6 @@ window.renderBarChart = function(containerId, state) {
     const maxVal = d3.max(data, d => Math.max(d.exportsval, d.importsval));
     const xScale = d3.scaleLinear().domain([-maxVal, maxVal]).range([0, width]);
 
-    // --- 3. ZOOM LOGIC ---
     const zoom = d3.zoom()
       .scaleExtent([1, 20])
       .extent([[0, 0], [width, height]])
@@ -87,11 +83,9 @@ window.renderBarChart = function(containerId, state) {
 
     svgRoot.call(zoom);
 
-    // Initial Axis Render
     xAxisG.call(d3.axisBottom(xScale).tickFormat(d => Math.abs(d / 1e9) + "B"));
     yAxisG.call(d3.axisLeft(yScale));
 
-    // Static Labels centered to the chart area
     const dashboardCenterX = width / 2;
     g.append("text")
       .attr("x", dashboardCenterX)
@@ -100,7 +94,6 @@ window.renderBarChart = function(containerId, state) {
       .style("font-size", "12px")
       .text("Trade Volume (Billion USD)");
 
-    // Bars with Tooltips & Clicks
     const handleBarClick = (event, d) => {
       if (typeof window.updateFilters === "function") {
         window.updateFilters(d.country, d.region);
@@ -147,7 +140,6 @@ window.renderBarChart = function(containerId, state) {
       })
       .on("click", handleBarClick);
     
-    // Centered Legend centered to the chart area
     const legendData = [
       { l: "Export", c: colors.export, x: -50 },
       { l: "Import", c: colors.import, x: 50 }
