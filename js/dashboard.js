@@ -41,21 +41,19 @@ const indicatorConfig = [
   }
 ];
 
-/**
- * Global helper to update country/continent filters from external components (like the map)
- * @param {string} country - The selected country name
- * @param {string} continent - The continent the country belongs to
- */
+let countriesByContinent = {};
+
 window.updateFilters = function(country, continent) {
-  state.country = country;
   state.continent = continent;
+  updateCountryOptions(continent);
+
+  state.country = country;
   
-  // Update the UI select elements to reflect the new state
-  const countrySelect = document.getElementById("select_country");
   const continentSelect = document.getElementById("select_continent");
+  const countrySelect = document.getElementById("select_country");
   
-  if (countrySelect) countrySelect.value = country;
   if (continentSelect) continentSelect.value = continent;
+  if (countrySelect) countrySelect.value = country;
   
   // Refresh all charts
   renderAll();
@@ -79,8 +77,10 @@ function initFilters() {
 
   continentSelect.addEventListener("change", e => {
     state.continent = e.target.value;
+    updateCountryOptions(state.continent);
     renderAll();
   });
+
 
   countrySelect.addEventListener("change", e => {
     state.country = e.target.value;
@@ -97,17 +97,20 @@ function initFilters() {
 
   d3.text("data/merged.csv").then(raw => {
     const data = d3.dsvFormat(";").parse(raw);
-    
-    const countries = Array.from(new Set(data.map(d => d["Country Name"]))).sort();
-    countries.forEach(c => {
-      const opt = document.createElement("option");
-      opt.value = opt.textContent = c;
-      countrySelect.appendChild(opt);
+
+    data.forEach(d => {
+      const country = d["Country Name"];
+      const continent = d.continent;
+
+      if (!countriesByContinent[continent]) {
+        countriesByContinent[continent] = new Set();
+      }
+      countriesByContinent[continent].add(country);
     });
-    if (!state.country && countries.length > 0) {
-      state.country = countries[0];
-      countrySelect.value = countries[0];
-    }
+
+    Object.keys(countriesByContinent).forEach(c => {
+      countriesByContinent[c] = Array.from(countriesByContinent[c]).sort();
+    });
 
     indicatorConfig.forEach(ind => {
       const opt = document.createElement("option");
@@ -117,12 +120,39 @@ function initFilters() {
       indicatorSelect.appendChild(opt);
     });
 
-    // Set initial description
     const initialCfg = indicatorConfig.find(c => c.key === state.indicator);
     descriptionDiv.textContent = initialCfg ? initialCfg.description : "";
 
+    updateCountryOptions(state.continent);
+
     renderAll();
   });
+}
+
+function updateCountryOptions(continent) {
+  const countrySelect = document.getElementById("select_country");
+  countrySelect.innerHTML = "";
+
+  const placeholder = document.createElement("option");
+  placeholder.textContent = "Select a country";
+  placeholder.disabled = true;
+  placeholder.selected = true;
+  countrySelect.appendChild(placeholder);
+
+  const countries = countriesByContinent[continent] || [];
+
+  countries.forEach(c => {
+    const opt = document.createElement("option");
+    opt.value = opt.textContent = c;
+    countrySelect.appendChild(opt);
+  });
+
+  if (countries.length > 0) {
+    state.country = countries[0];
+    countrySelect.value = countries[0];
+  } else {
+    state.country = null;
+  }
 }
 
 function renderAll() {
